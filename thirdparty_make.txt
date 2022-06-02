@@ -1,0 +1,49 @@
+git clone --recursive https://github.com/intel-isl/Open3D.git
+cd Open3D
+util/install_deps_ubuntu.sh
+mkdir build
+cd build
+# cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=${HOME}/open3d_install ..
+cmake -DBUILD_SHARED_LIBS=ON ..
+# make install -j 12
+make -j$(nproc)
+make install
+
+install opensfm
+sudo apt install libgflags-dev
+sudo apt install libgoogle-glog-dev
+sudo apt-get install libmetis-dev
+
+// 先查看当前版本
+gcc --version
+g++ --version
+// 升级至11
+// 添加源并更新
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo apt update
+// 安装
+sudo apt install gcc-11 g++-11
+
+// 查看目前安装了多少版本的gcc
+sudo updatedb && sudo ldconfig
+locate gcc | grep -E "/usr/bin/gcc-"
+
+// 命令最后的1和10是优先级，如果使用auto选择模式，系统将默认使用优先级高的
+// 假设只安装了GCC/G++ 7和11版本
+sudo update-alternatives --remove-all gcc
+sudo update-alternatives --remove-all g++
+
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 1
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 10
+
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 1
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 10
+
+// 验证
+gcc --version
+g++ --version
+
+install ceres
+
+change OpenSFM CMakeLists.txt:
+	set(CMAKE_CXX_STANDARD 17)
