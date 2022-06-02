@@ -1,14 +1,69 @@
+import time
+
 import cv2
 import open3d
 import numpy as np
+import matplotlib.pyplot as plt
 
-# pcd_open3d = open3d.geometry.PointCloud()
-# pcd = np.random.random((100, 3))
-# color = np.random.randint(0, 255, (100, 3))
-# pcd_open3d.points = open3d.utility.Vector3dVector(pcd)
-# pcd_open3d.points = open3d.utility.Vector3dVector(color)
+from reconstruct.open3d_utils import create_color_and_depth_path
+import pandas as pd
+
+# rgbd_1 = create_color_and_depth_path(
+#     color_path='/home/quan/Desktop/tempary/dataset/color/21.jpg',
+#     depth_path='/home/quan/Desktop/tempary/dataset/depth/21.png',
+# )
+# # rgbd_2 = create_color_and_depth_path(
+# #     color_path='/home/quan/Desktop/tempary/dataset/color/22.jpg',
+# #     depth_path='/home/quan/Desktop/tempary/dataset/depth/22.png',
+# # )
 #
-# open3d.visualization.draw_geometries([pcd_open3d])
+# plt.subplot(1, 2, 1)
+# plt.title('Redwood grayscale image')
+# plt.imshow(rgbd_1.color)
+# plt.subplot(1, 2, 2)
+# plt.title('Redwood depth image')
+# plt.imshow(rgbd_1.depth)
+# plt.show()
 
-all_points = np.array([]).reshape((0, 3))
-print(all_points.shape)
+import threading
+
+open3d.utility.set_verbosity_level(open3d.utility.VerbosityLevel.Debug)
+
+vis = open3d.visualization.Visualizer()
+vis.create_window()
+
+pcd = open3d.geometry.PointCloud()
+colors = np.tile(np.array([[255, 0, 0]], dtype=np.uint8), (1000, 1))
+points = np.random.random((1000, 3))
+pcd.points = open3d.utility.Vector3dVector(points)
+pcd.colors = open3d.utility.Vector3dVector(colors)
+
+# open3d.visualization.draw_geometries([pcd])
+
+vis.add_geometry(pcd)
+
+def run():
+    while True:
+        pcd_current = open3d.geometry.PointCloud()
+        colors = (np.random.randint(0, 255, (2000, 3))).astype(np.uint8)
+        points = np.random.random((2000, 3))
+        pcd_current.points = open3d.utility.Vector3dVector(points)
+        pcd_current.colors = open3d.utility.Vector3dVector(colors)
+
+        pcd.points = pcd_current.points
+        pcd.colors = pcd_current.colors
+
+        vis.update_geometry(pcd)
+        vis.poll_events()
+        vis.update_renderer()
+
+        time.sleep(0.1)
+
+# vis.destroy_window()
+
+if __name__ == '__main__':
+    t = threading.Thread(target=run)
+    t.start()
+    print('sadasd')
+    t.join()
+

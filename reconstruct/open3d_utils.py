@@ -1,10 +1,17 @@
 import open3d
 import numpy as np
+import cv2
+import matplotlib.pyplot as plt
 
 def create_img_from_numpy(
         img:np.array
 )->open3d.geometry.Image:
     return open3d.geometry.Image(img)
+
+def create_img_tensor_from_numpy(
+        img:np.array
+)->open3d.geometry.Image:
+    return open3d.t.geometry.Image(img)
 
 def create_rgbd_from_color_depth(
     color: open3d.geometry.Image,
@@ -57,6 +64,17 @@ def create_scaleable_TSDF(
         color_type=color_type
     )
     return tsdf_model
+
+def create_color_and_depth_path(color_path, depth_path):
+    color_img = cv2.imread(color_path)
+    depth_img = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+    color_img = create_img_from_numpy(color_img)
+    depth_img = create_img_from_numpy(depth_img)
+    rgbd = create_rgbd_from_color_depth(
+        color=color_img, depth=depth_img,
+        depth_trunc=0.5, convert_rgb_to_intensity=False
+    )
+    return rgbd
 
 if __name__ == '__main__':
     option = open3d.pipelines.odometry.OdometryOption()
