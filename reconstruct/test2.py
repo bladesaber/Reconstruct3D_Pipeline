@@ -42,8 +42,26 @@ pcd.colors = open3d.utility.Vector3dVector(colors)
 
 vis.add_geometry(pcd)
 
-def run():
-    while True:
+# for _ in range(100):
+#     pcd_current = open3d.geometry.PointCloud()
+#     colors = (np.random.randint(0, 255, (2000, 3))).astype(np.uint8)
+#     points = np.random.random((2000, 3))
+#     pcd_current.points = open3d.utility.Vector3dVector(points)
+#     pcd_current.colors = open3d.utility.Vector3dVector(colors)
+#
+#     pcd.points = pcd_current.points
+#     pcd.colors = pcd_current.colors
+#
+#     vis.update_geometry(pcd)
+#     vis.poll_events()
+#     vis.update_renderer()
+#
+#     time.sleep(1.0)
+
+def threat_run():
+    global vis, pcd
+
+    for _ in range(100):
         pcd_current = open3d.geometry.PointCloud()
         colors = (np.random.randint(0, 255, (2000, 3))).astype(np.uint8)
         points = np.random.random((2000, 3))
@@ -57,13 +75,35 @@ def run():
         vis.poll_events()
         vis.update_renderer()
 
-        time.sleep(0.1)
+        time.sleep(1.0)
 
-# vis.destroy_window()
+t = threading.Thread(target=threat_run)
+t.start()
+print('asd')
+t.join()
 
-if __name__ == '__main__':
-    t = threading.Thread(target=run)
-    t.start()
-    print('sadasd')
-    t.join()
+# def run():
+#     while True:
+#         pcd_current = open3d.geometry.PointCloud()
+#         colors = (np.random.randint(0, 255, (2000, 3))).astype(np.uint8)
+#         points = np.random.random((2000, 3))
+#         pcd_current.points = open3d.utility.Vector3dVector(points)
+#         pcd_current.colors = open3d.utility.Vector3dVector(colors)
+#
+#         pcd.points = pcd_current.points
+#         pcd.colors = pcd_current.colors
+#
+#         vis.update_geometry(pcd)
+#         vis.poll_events()
+#         vis.update_renderer()
+#
+#         time.sleep(1.0)
+#
+# # vis.destroy_window()
+#
+# if __name__ == '__main__':
+#     t = threading.Thread(target=run)
+#     t.start()
+#     print('sadasd')
+#     t.join()
 

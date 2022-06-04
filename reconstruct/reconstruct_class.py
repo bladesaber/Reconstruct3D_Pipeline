@@ -3,9 +3,9 @@ import open3d
 import copy
 import pandas as pd
 import matplotlib.pyplot as plt
+import time
 
 from reconstruct.open3d_utils import create_img_from_numpy
-from reconstruct.open3d_utils import create_intrinsics
 from reconstruct.open3d_utils import create_rgbd_from_color_depth
 from reconstruct.open3d_utils import create_pcd_from_rgbd
 from reconstruct.open3d_utils import create_OdometryOption
@@ -96,9 +96,18 @@ class ICP_Odometry(object):
             )
     model.trans_list.append(trans_odometry.copy())
     '''
-    def __init__(self):
+    def __init__(self,
+                 depth_trunc,
+                 tsdf_voxel_size,
+                 ):
+        self.depth_trunc = depth_trunc
+        self.tsdf_voxel_size = tsdf_voxel_size
+
         self.trans_list = []
-        self.tsdf_model = create_scaleable_TSDF(voxel_size=0.002, sdf_trunc=0.02)
+        self.tsdf_model = create_scaleable_TSDF(
+            voxel_size=self.tsdf_voxel_size,
+            sdf_trunc=2 * self.tsdf_voxel_size
+        )
 
     def init(self, color_img, depth_img, instrinc):
         self.instrinc = instrinc
@@ -107,7 +116,7 @@ class ICP_Odometry(object):
         depth_img = create_img_from_numpy(depth_img)
         rgbd = create_rgbd_from_color_depth(
             color=color_img, depth=depth_img,
-            depth_trunc=0.5, convert_rgb_to_intensity=False
+            depth_trunc=self.depth_trunc, convert_rgb_to_intensity=False
         )
         pcd = create_pcd_from_rgbd(rgbd=rgbd, instrics=self.instrinc)
         self.pcd_prev = pcd
@@ -223,21 +232,30 @@ class ICP_Odometry(object):
         return result_icp
 
     def compute(self, color_img, depth_img, trans_current):
+        start_preprocess = time.time()
+
         color_img_raw = color_img.copy()
         color_img = create_img_from_numpy(color_img)
         depth_img = create_img_from_numpy(depth_img)
 
         rgbd_current = create_rgbd_from_color_depth(color=color_img, depth=depth_img,
-                                                    depth_trunc=0.5,
+                                                    depth_trunc=self.depth_trunc,
                                                     convert_rgb_to_intensity=False)
         pcd_current = create_pcd_from_rgbd(rgbd_current, instrics=self.instrinc)
 
+        cost_preprocess = time.time() - start_preprocess
+        print('[DEBUG]: Cost of preprocess: ', cost_preprocess)
+
+        start_icp = time.time()
         trans_dif, information_matrix = self.multiscale_icp(
             source=self.pcd_prev, target=pcd_current,
-            voxel_sizes=[0.01, 0.005],
-            max_iters=[50, 30],
+            voxel_sizes=[0.03],
+            max_iters=[100],
             icp_method='point_to_plane'
         )
+        cost_icp = time.time() - start_icp
+        print('[DEBUG]: Cost of icp: ', cost_icp)
+
         trans_current = np.dot(trans_dif, trans_current)
 
         self.tsdf_model.integrate(rgbd_current, intrinsic=self.instrinc, extrinsic=trans_current)
@@ -250,8 +268,8 @@ class ICP_Odometry(object):
         target_temp = copy.deepcopy(target)
         source_temp.transform(transformation)
 
-        source_temp = source_temp.voxel_down_sample(0.005)
-        target_temp = target_temp.voxel_down_sample(0.005)
+        source_temp = source_temp.voxel_down_sample(0.01)
+        target_temp = target_temp.voxel_down_sample(0.01)
 
         source_pcd_np = np.asarray(source_temp.points)
         source_open3d = open3d.geometry.PointCloud()
@@ -280,11 +298,20 @@ class RayCasting_Odometry(object):
     )
     model.trans_list.append(trans_dif.copy())
     '''
-    def __init__(self):
-        self.tsdf_model = create_scaleable_TSDF(voxel_size=0.002, sdf_trunc=0.02)
+    def __init__(self,
+                 depth_trunc,
+                 tsdf_voxel_size,
+                 ):
+        self.tsdf_model = create_scaleable_TSDF(
+            voxel_size=tsdf_voxel_size,
+            sdf_trunc=2 * tsdf_voxel_size
+        )
         self.trans_list = []
 
-    def init(self, color_img, depth_img, instrinc):
+        self.depth_trunc = depth_trunc
+        self.tsdf_voxel_size = tsdf_voxel_size
+
+    def init(self, color_img, depth_img, instrinc,):
         self.instrinc = instrinc
         self.instrinc_np = np.array([
             [606.9685, 0, 326.858],
@@ -296,7 +323,7 @@ class RayCasting_Odometry(object):
         depth_img = create_img_from_numpy(depth_img)
         rgbd = create_rgbd_from_color_depth(
             color=color_img, depth=depth_img,
-            depth_trunc=0.5, convert_rgb_to_intensity=False
+            depth_trunc=self.depth_trunc, convert_rgb_to_intensity=False
         )
         self.tsdf_model.integrate(rgbd, intrinsic=self.instrinc, extrinsic=np.identity(4))
 
@@ -409,13 +436,18 @@ class RayCasting_Odometry(object):
         return result_icp
 
     def compute(self, color_img, depth_img, trans_current):
+        start_preprocess = time.time()
+
         color_img = create_img_from_numpy(color_img)
         depth_img = create_img_from_numpy(depth_img)
 
         rgbd_current = create_rgbd_from_color_depth(color=color_img, depth=depth_img,
-                                                    depth_trunc=0.5,
+                                                    depth_trunc=self.depth_trunc,
                                                     convert_rgb_to_intensity=False)
         pcd_current = create_pcd_from_rgbd(rgbd_current, instrics=self.instrinc)
+
+        cost_preprocess = time.time() - start_preprocess
+        print('[DEBUG]: Cost of preprocess: ', cost_preprocess)
 
         ### -----------------
         tsdf_pcd = self.tsdf_model.extract_point_cloud()
@@ -424,6 +456,7 @@ class RayCasting_Odometry(object):
         ### debug
         # open3d.visualization.draw_geometries([tsdf_pcd, pcd_current])
 
+        start_raycasting = time.time()
         tsdf_pcd_np = np.asarray(tsdf_pcd.points)
         tsdf_pcd_color = np.asarray(tsdf_pcd.colors)
         # inv_instrinc = np.linalg.inv(self.instrinc_np)
@@ -444,12 +477,22 @@ class RayCasting_Odometry(object):
 
         width_limit = np.bitwise_and(uvd[:, 0]<639, uvd[:, 0]>0)
         height_limit = np.bitwise_and(uvd[:, 1]<479, uvd[:, 1]>0)
-        select_idx = np.bitwise_and(width_limit, height_limit)
-        uvd = uvd[select_idx]
-        tsdf_pcd_color = tsdf_pcd_color[select_idx]
+        depth_limit = uvd[:, 2]>0.1
+        select_bool = np.bitwise_and(width_limit, height_limit)
+        select_bool = np.bitwise_and(select_bool, depth_limit)
+        uvd = uvd[select_bool]
+        tsdf_pcd_color = tsdf_pcd_color[select_bool]
 
         uvd_rgb = np.concatenate((uvd, tsdf_pcd_color), axis=1)
         uvd_rgb_df = pd.DataFrame(uvd_rgb, columns=['u', 'v', 'd', 'r', 'g', 'b'])
+
+        ### todo here need voxel
+        uvd_rgb_df['u'] = uvd_rgb_df['u'].astype(np.int)
+        uvd_rgb_df['v'] = uvd_rgb_df['v'].astype(np.int)
+        uvd_rgb_df['d'] = (uvd_rgb_df['d'] // 0.01) * 0.01
+        uvd_rgb_df = uvd_rgb_df[uvd_rgb_df['d']<self.depth_trunc]
+        uvd_rgb_df = uvd_rgb_df[uvd_rgb_df['d']>0.1]
+
         uvd_rgb_df.sort_values(by=['d'], inplace=True)
         uvd_rgb_df.drop_duplicates(keep='first', inplace=True)
         uvd_rgb_df_np = uvd_rgb_df.to_numpy()
@@ -478,12 +521,19 @@ class RayCasting_Odometry(object):
         ###------ debug
         # open3d.visualization.draw_geometries([pcd_ref])
 
+        cost_raycasting = time.time() - start_raycasting
+        print('[DEBUG]: Cost of RayCasting: ', cost_raycasting)
+
+        start_icp = time.time()
         trans_dif, information_matrix = self.multiscale_icp(
             source=pcd_ref, target=pcd_current,
-            voxel_sizes=[0.01],
+            voxel_sizes=[0.03],
             max_iters=[100],
             icp_method='point_to_plane',
         )
+        cost_icp = time.time() - start_icp
+        print('[DEBUG]: Cost of icp: ', cost_icp)
+
         trans_current = np.dot(trans_dif, trans_current)
 
         # tsdf_pcd.transform(trans_dif)
