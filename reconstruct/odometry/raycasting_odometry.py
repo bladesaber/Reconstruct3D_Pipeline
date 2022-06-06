@@ -247,6 +247,9 @@ class RayCasting_Odometry(object):
         pcd_ref.points = open3d.utility.Vector3dVector(uvd_np)
         pcd_ref.colors = open3d.utility.Vector3dVector(rgb_np)
 
+        ### todo 尝试加DBSCAN去除不相关实体点
+        ### todo
+
         ###------ debug
         # open3d.visualization.draw_geometries([pcd_ref])
 

@@ -23,6 +23,7 @@ from reconstruct.odometry.rgbd_test_odometry import RGBD_Odometry
 from reconstruct.odometry.icp_odometry import ICP_Odometry
 from reconstruct.odometry.raycasting_odometry import RayCasting_Odometry
 from reconstruct.odometry.visual_rgbd_odometry import Visual_RGBD_Odometry
+from reconstruct.odometry.posegraph_odometry import PoseGraph_Chunk_Odometry
 
 def main():
     camera = Camera_Fake_2(
@@ -46,12 +47,15 @@ def main():
     # model = ICP_Odometry(
     #     depth_trunc=3.0, tsdf_voxel_size=0.02
     # )
-    model = RayCasting_Odometry(
-        depth_trunc=3.0, tsdf_voxel_size=0.02
-    )
+    # model = RayCasting_Odometry(
+    #     depth_trunc=3.0, tsdf_voxel_size=0.02
+    # )
     # model = Visual_RGBD_Odometry(
     #     depth_trunc=3.0, tsdf_voxel_size=0.02
     # )
+    model = PoseGraph_Chunk_Odometry(
+        depth_trunc=3.0, tsdf_voxel_size=0.02
+    )
 
     cv_sleep_time = 0
     run_count = 0
@@ -100,20 +104,19 @@ def main():
             )
 
         else:
+            # model.compute(
+            #     color_img=color_img, depth_img=depth_img,
+            #     trans_current=trans_odometry
+            # )
             odometry_status, trans_odometry, trans_dif, remap_img = model.compute(
                 color_img=color_img, depth_img=depth_img,
                 trans_current=trans_odometry
             )
 
-            if odometry_status:
-                model.trans_list.append(trans_dif.copy())
-            else:
+            if odometry_status==False:
                 cv_sleep_time = 0
-
-            # model.compute(
-            #     color_img=color_img, depth_img=depth_img,
-            #     trans_current=trans_odometry
-            # )
+            # else:
+            #     model.trans_list.append(trans_dif.copy())
 
         # tsdf_pcd = model.tsdf_model.extract_point_cloud()
         # vis_pcd.points = tsdf_pcd.points
@@ -154,10 +157,10 @@ def main():
         # if run_count == 10:
         #     break
 
-    # # vis.threat.join()
+    # vis.threat.join()
     tsdf_pcd = model.tsdf_model.extract_point_cloud()
     open3d.visualization.draw_geometries([tsdf_pcd])
-    open3d.io.write_point_cloud('/home/quan/Desktop/company/car_1.ply', pointcloud=tsdf_pcd)
+    # open3d.io.write_point_cloud('/home/quan/Desktop/company/car_1.ply', pointcloud=tsdf_pcd)
 
 if __name__ == '__main__':
     main()
