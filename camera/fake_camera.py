@@ -77,6 +77,29 @@ class Camera_Fake_2(object):
         else:
             return False, None, None
 
+    def get_img_from_range(self, start_id, end_id):
+        img_pack = {}
+        idx_list = []
+
+        for idx in range(start_id, end_id+1, 1):
+            color_path = self.color_files_dict[idx]
+            depth_path = self.depth_files_dict[idx]
+
+            color_path = os.path.join(self.color_save_dir, color_path)
+            depth_path = os.path.join(self.depth_save_dir, depth_path)
+            print(color_path)
+
+            color_image = cv2.imread(color_path)
+            depth_image = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+
+            img_pack[idx] = {
+                'color': color_image, 'depth': depth_image
+            }
+
+            idx_list.append(idx)
+
+        return img_pack, img_pack
+
     def load_instrincs(self, intrinsics_path):
         with open(intrinsics_path, 'r') as f:
             instrics = json.load(f)

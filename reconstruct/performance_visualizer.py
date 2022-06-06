@@ -27,11 +27,11 @@ from reconstruct.odometry.posegraph_odometry import PoseGraph_Chunk_Odometry
 
 def main():
     camera = Camera_Fake_2(
-        save_dir='/home/quan/Desktop/company/Reconstruct3D_Pipeline/data/rgbd/00003',
+        save_dir='/home/quan/Desktop/work/Reconstruct3D_Pipeline/data/rgbd/00003',
     )
 
     camera_instrics = camera.load_instrincs(
-        intrinsics_path='/home/quan/Desktop/company/Reconstruct3D_Pipeline/data/instrincs.json'
+        intrinsics_path='/home/quan/Desktop/work/Reconstruct3D_Pipeline/data/instrincs.json'
     )
     depth_instric = camera_instrics['depth']
     instrinc_open3d = create_intrinsics(

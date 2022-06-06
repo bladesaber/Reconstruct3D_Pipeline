@@ -335,7 +335,7 @@ class PoseGraph_Chunk_Odometry(object):
         return trans_current, remap_img
 
     def compute(self, color_img, depth_img, trans_current):
-        color_img_raw = color_img.copy()
+        return_img = color_img.copy()
 
         color_img = create_img_from_numpy(color_img)
         depth_img = create_img_from_numpy(depth_img)
@@ -362,7 +362,7 @@ class PoseGraph_Chunk_Odometry(object):
                 )
             )
             self.queue_id += 1
-            print('[DEBUG]: queue.size is 1 and finish %d'%self.queue.qsize())
+            # print('[DEBUG]: queue.size is 1 and finish %d'%self.queue.qsize())
 
         else:
             trans_dif_from_prev, info_prev = self.multiscale_icp(
@@ -389,10 +389,10 @@ class PoseGraph_Chunk_Odometry(object):
                 )
             )
             self.queue_id += 1
-            print('[DEBUG]: queue.size larger than 1 and finish %d'%self.queue.qsize())
+            # print('[DEBUG]: queue.size larger than 1 and finish %d'%self.queue.qsize())
 
         if self.queue.full():
-            print('[DEBUG]: begin pose graph opt %d' % self.queue.qsize())
+            # print('[DEBUG]: begin pose graph opt %d' % self.queue.qsize())
 
             pose_graph = self.chunk_posegraph_opt()
             node_num = len(pose_graph.nodes)
@@ -411,10 +411,11 @@ class PoseGraph_Chunk_Odometry(object):
                 local_tsdf_model.integrate(rgbd, self.instrinc, pose)
 
             # # open3d.visualization.draw_geometries([local_tsdf_model.extract_point_cloud()])
-            # open3d.io.write_point_cloud(
-            #     os.path.join('/home/quan/Desktop/company/template', '%d.ply'%self.template_id),
-            #     local_tsdf_model.extract_point_cloud()
-            # )
+            open3d.io.write_point_cloud(
+                os.path.join('/home/quan/Desktop/template/cache', '%d_local.ply'%self.template_id),
+                local_tsdf_model.extract_point_cloud()
+            )
+            print('[DEBUG]: save template_id:%d'%self.template_id)
             # self.template_id += 1
             ### ------
 
@@ -429,10 +430,10 @@ class PoseGraph_Chunk_Odometry(object):
 
             ### ------ debug
             open3d.io.write_point_cloud(
-                os.path.join('/home/quan/Desktop/company/template', '%d.ply'%self.template_id),
+                os.path.join('/home/quan/Desktop/template/cache', '%d_tsdf.ply'%self.template_id),
                 self.tsdf_model.extract_point_cloud()
             )
-            self.template_id += 1
+            # self.template_id += 1
             ### ---------
 
             self.odometry_orig = np.linalg.inv(pose_graph.nodes[node_num-1].pose).dot(self.odometry_orig)
@@ -441,39 +442,38 @@ class PoseGraph_Chunk_Odometry(object):
                 trans_current=self.odometry_orig
             )
 
-            # ### ------ debug
-            # template_pcd = open3d.geometry.PointCloud()
-            #
-            # template_pointcloud = np.asarray(pcd_current.points)
-            # template_color = np.tile(np.array([[255,0,0]]), [template_pointcloud.shape[0], 1])
-            #
-            # local_tsdf_pcd = open3d.geometry.PointCloud()
-            # local_tsdf_pcd.points = copy.deepcopy(self.tsdf_model.extract_point_cloud().points)
-            # local_tsdf_pcd.colors = copy.deepcopy(self.tsdf_model.extract_point_cloud().colors)
-            # local_tsdf_pcd.transform(self.odometry_orig)
-            # local_tsdf_pcd_pointcloud = np.asarray(local_tsdf_pcd.points)
-            # local_tsdf_pcd_colors = np.asarray(local_tsdf_pcd.colors)
-            # concat_pcd = np.concatenate(
-            #     [template_pointcloud, local_tsdf_pcd_pointcloud], axis=0
-            # )
-            # concat_color = np.concatenate(
-            #     [template_color, local_tsdf_pcd_colors], axis=0
-            # )
-            #
-            # template_pcd.points = open3d.utility.Vector3dVector(concat_pcd)
-            # template_pcd.colors = open3d.utility.Vector3dVector(concat_color)
-            #
-            # # open3d.visualization.draw_geometries([template_pcd])
-            # open3d.io.write_point_cloud(
-            #     os.path.join('/home/quan/Desktop/company/template', '%d.ply'%self.template_id), template_pcd
-            # )
-            # self.template_id +=1
-            # ### ------------
+            ### ------ debug
+            template_pcd = open3d.geometry.PointCloud()
+
+            template_pointcloud = np.asarray(pcd_current.points)
+            template_color = np.tile(np.array([[255,0,0]]), [template_pointcloud.shape[0], 1])
+
+            local_tsdf_pcd = open3d.geometry.PointCloud()
+            local_tsdf_pcd.points = copy.deepcopy(self.tsdf_model.extract_point_cloud().points)
+            local_tsdf_pcd.colors = copy.deepcopy(self.tsdf_model.extract_point_cloud().colors)
+            local_tsdf_pcd.transform(self.odometry_orig)
+            local_tsdf_pcd_pointcloud = np.asarray(local_tsdf_pcd.points)
+            local_tsdf_pcd_colors = np.asarray(local_tsdf_pcd.colors)
+            concat_pcd = np.concatenate(
+                [template_pointcloud, local_tsdf_pcd_pointcloud], axis=0
+            )
+            concat_color = np.concatenate(
+                [template_color, local_tsdf_pcd_colors], axis=0
+            )
+
+            template_pcd.points = open3d.utility.Vector3dVector(concat_pcd)
+            template_pcd.colors = open3d.utility.Vector3dVector(concat_color)
+
+            # open3d.visualization.draw_geometries([template_pcd])
+            open3d.io.write_point_cloud(
+                os.path.join('/home/quan/Desktop/template/cache', '%d_compare.ply'%self.template_id),
+                template_pcd
+            )
+            self.template_id +=1
+            ### ------------
 
             self.rgbd_orig = rgbd_current
             self.pcd_orig = pcd_current
-            self.rgbd_prev = rgbd_current
-            self.pcd_prev = pcd_current
 
             self.rgbd_dict.clear()
             self.queue_id = 0
@@ -486,6 +486,10 @@ class PoseGraph_Chunk_Odometry(object):
             )
             self.queue_id += 1
 
-            # return True, None, None, remap_img
+            return_img = remap_img
 
-        return True, None, None, color_img_raw
+        ### do not forget this
+        self.rgbd_prev = rgbd_current
+        self.pcd_prev = pcd_current
+
+        return True, None, None, return_img
