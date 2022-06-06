@@ -19,18 +19,18 @@ from reconstruct.open3d_utils import create_scaleable_TSDF
 
 from reconstruct.performance_utils import NonBlock_Visualizer
 
-from reconstruct.reconstruct_class import RGBD_Odometry
-from reconstruct.reconstruct_class import ICP_Odometry
-from reconstruct.reconstruct_class import RayCasting_Odometry
-from reconstruct.reconstruct_class import Visual_Odometry
+from reconstruct.odometry.rgbd_test_odometry import RGBD_Odometry
+from reconstruct.odometry.icp_odometry import ICP_Odometry
+from reconstruct.odometry.raycasting_odometry import RayCasting_Odometry
+from reconstruct.odometry.visual_rgbd_odometry import Visual_RGBD_Odometry
 
 def main():
     camera = Camera_Fake_2(
-        save_dir='/home/quan/Desktop/work/Reconstruct3D_Pipeline/data/rgbd/00003',
+        save_dir='/home/quan/Desktop/company/Reconstruct3D_Pipeline/data/rgbd/00003',
     )
 
     camera_instrics = camera.load_instrincs(
-        intrinsics_path='/home/quan/Desktop/work/Reconstruct3D_Pipeline/data/instrincs.json'
+        intrinsics_path='/home/quan/Desktop/company/Reconstruct3D_Pipeline/data/instrincs.json'
     )
     depth_instric = camera_instrics['depth']
     instrinc_open3d = create_intrinsics(
@@ -46,12 +46,12 @@ def main():
     # model = ICP_Odometry(
     #     depth_trunc=3.0, tsdf_voxel_size=0.02
     # )
-    # model = RayCasting_Odometry(
-    #     depth_trunc=3.0, tsdf_voxel_size=0.02
-    # )
-    model = Visual_Odometry(
+    model = RayCasting_Odometry(
         depth_trunc=3.0, tsdf_voxel_size=0.02
     )
+    # model = Visual_RGBD_Odometry(
+    #     depth_trunc=3.0, tsdf_voxel_size=0.02
+    # )
 
     cv_sleep_time = 0
     run_count = 0
@@ -154,9 +154,10 @@ def main():
         # if run_count == 10:
         #     break
 
-    # # # vis.threat.join()
-    # tsdf_pcd = model.tsdf_model.extract_point_cloud()
-    # open3d.visualization.draw_geometries([tsdf_pcd])
+    # # vis.threat.join()
+    tsdf_pcd = model.tsdf_model.extract_point_cloud()
+    open3d.visualization.draw_geometries([tsdf_pcd])
+    open3d.io.write_point_cloud('/home/quan/Desktop/company/car_1.ply', pointcloud=tsdf_pcd)
 
 if __name__ == '__main__':
     main()
