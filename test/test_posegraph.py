@@ -45,7 +45,7 @@ def multiscale_icp(
                 source_down, target_down, voxel_size * 1.4,
                 result_icp.transformation)
 
-    # print(result_icp)
+    print(result_icp)
     # self.draw_registration_result_original_color(source, target, result_icp.transformation)
 
     return (result_icp.transformation, information_matrix)
@@ -127,6 +127,8 @@ def chunk_posegraph_opt(queue, rgbd_dict):
         id_current, rgbd, trans_dif_from_prev, info_prev, trans_dif_from_orig, info_orig = queue.get()
         rgbd_dict[id_current] = rgbd
 
+        print('[DEBUG]: add %d to graph'%id_current)
+
         if id_current == 0:
             pose_graph.nodes.append(
                 open3d.pipelines.registration.PoseGraphNode(trans_odometry)
@@ -158,6 +160,8 @@ def chunk_posegraph_opt(queue, rgbd_dict):
                     )
                 )
 
+        # id_prev = id_current
+
     run_posegraph_optimization(pose_graph=pose_graph)
 
     return pose_graph
@@ -183,13 +187,13 @@ def run_posegraph_optimization(
     open3d.utility.set_verbosity_level(open3d.utility.VerbosityLevel.Error)
 
 
-def main():
+def test_posegraph():
     camera = Camera_Fake_2(
-        save_dir='/home/quan/Desktop/work/Reconstruct3D_Pipeline/data/rgbd/00003',
+        save_dir='/home/quan/Desktop/company/Reconstruct3D_Pipeline/data/rgbd/00003',
     )
 
     camera_instrics = camera.load_instrincs(
-        intrinsics_path='/home/quan/Desktop/work/Reconstruct3D_Pipeline/data/instrincs.json'
+        intrinsics_path='/home/quan/Desktop/company/Reconstruct3D_Pipeline/data/instrincs.json'
     )
     depth_instric = camera_instrics['depth']
     instrinc_open3d = create_intrinsics(
@@ -202,7 +206,7 @@ def main():
     )
 
     img_pack, idx_list = camera.get_img_from_range(
-        start_id=316, end_id=326
+        start_id=46, end_id=56
     )
 
     pcd_orig = None
@@ -214,6 +218,9 @@ def main():
     for count_id, idx in enumerate(idx_list):
         color_img = img_pack[idx]['color']
         depth_img = img_pack[idx]['depth']
+
+        color_img = create_img_from_numpy(color_img)
+        depth_img = create_img_from_numpy(depth_img)
         rgbd_current = create_rgbd_from_color_depth(color=color_img, depth=depth_img,
                                                     depth_trunc=3.0,
                                                     convert_rgb_to_intensity=False)
@@ -272,6 +279,7 @@ def main():
 
         pcd_prev = pcd_current
 
+    print('-------------------------------------------------------------')
     pose_graph = chunk_posegraph_opt(queue=queue, rgbd_dict=rgbd_dict)
     node_num = len(pose_graph.nodes)
 
@@ -292,3 +300,6 @@ def main():
     #     os.path.join('/home/quan/Desktop/template/cache', '%d_local.ply' % 0),
     #     local_tsdf_model.extract_point_cloud()
     # )
+
+if __name__ == '__main__':
+    test_posegraph()

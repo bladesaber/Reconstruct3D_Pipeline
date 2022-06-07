@@ -247,15 +247,26 @@ class RayCasting_Odometry(object):
         pcd_ref.points = open3d.utility.Vector3dVector(uvd_np)
         pcd_ref.colors = open3d.utility.Vector3dVector(rgb_np)
 
-        ### todo 尝试加DBSCAN去除不相关实体点
-        ### todo
-
         ###------ debug
         # open3d.visualization.draw_geometries([pcd_ref])
 
         cost_raycasting = time.time() - start_raycasting
         print('[DEBUG]: Cost of RayCasting: ', cost_raycasting)
 
+        # ### todo 尝试加DBSCAN去除不相关实体点
+        # ### todo 去除地面
+        # labels = np.array(pcd_ref.cluster_dbscan(eps=self.tsdf_voxel_size * 2, min_points=10, print_progress=True))
+        # # max_label = labels.max()
+        # # colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
+        # # colors[labels < 0] = 0
+        # # pcd_ref.colors = open3d.utility.Vector3dVector(colors[:, :3])
+        #
+        # valid_class_idx = np.nonzero(labels==0)[0]
+        # pcd_ref.select_by_index(valid_class_idx)
+        # # print(np.bincount(labels))
+        # # open3d.visualization.draw_geometries([pcd_ref])
+
+        ### ------
         start_icp = time.time()
         trans_dif, information_matrix = self.multiscale_icp(
             source=pcd_ref, target=pcd_current,

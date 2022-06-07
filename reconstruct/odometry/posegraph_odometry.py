@@ -51,9 +51,7 @@ class PoseGraph_Chunk_Odometry(object):
         )
         pcd = create_pcd_from_rgbd(rgbd, instrics=self.instrinc)
 
-        self.rgbd_orig = rgbd
         self.pcd_orig = pcd
-        self.rgbd_prev = rgbd
         self.pcd_prev = pcd
 
         self.odometry_orig = np.identity(4)
@@ -187,6 +185,7 @@ class PoseGraph_Chunk_Odometry(object):
                 pose_graph.nodes.append(
                     open3d.pipelines.registration.PoseGraphNode(trans_odometry)
                 )
+                print('[DEBUG]: Add Node %d'%id_current)
 
             else:
                 trans_odometry = trans_dif_from_prev.dot(trans_odometry)
@@ -194,6 +193,7 @@ class PoseGraph_Chunk_Odometry(object):
                 pose_graph.nodes.append(
                     open3d.pipelines.registration.PoseGraphNode(trans_odometry_inv)
                 )
+                print('[DEBUG]: Add Node %d' % id_current)
 
                 pose_graph.edges.append(
                     open3d.pipelines.registration.PoseGraphEdge(
@@ -203,9 +203,10 @@ class PoseGraph_Chunk_Odometry(object):
                         uncertain=False
                     )
                 )
+                print('[DEBUG]: Add Adjacent Edge from %d to %d' %(id_prev, id_current))
 
                 ### loop closeure
-                if id_current>1:
+                if trans_dif_from_orig is not None:
                     pose_graph.edges.append(
                         open3d.pipelines.registration.PoseGraphEdge(
                             0, id_current,
@@ -214,6 +215,9 @@ class PoseGraph_Chunk_Odometry(object):
                             uncertain=True
                         )
                     )
+                    print('[DEBUG]: Add Loop Closeure Edge from %d to %d' % (0, id_current))
+
+            id_prev = id_current
 
         self.run_posegraph_optimization(pose_graph=pose_graph)
 
@@ -361,8 +365,6 @@ class PoseGraph_Chunk_Odometry(object):
                     None, None
                 )
             )
-            self.queue_id += 1
-            # print('[DEBUG]: queue.size is 1 and finish %d'%self.queue.qsize())
 
         else:
             trans_dif_from_prev, info_prev = self.multiscale_icp(
@@ -388,8 +390,6 @@ class PoseGraph_Chunk_Odometry(object):
                     trans_dif_from_orig, info_orig
                 )
             )
-            self.queue_id += 1
-            # print('[DEBUG]: queue.size larger than 1 and finish %d'%self.queue.qsize())
 
         if self.queue.full():
             # print('[DEBUG]: begin pose graph opt %d' % self.queue.qsize())
@@ -397,27 +397,27 @@ class PoseGraph_Chunk_Odometry(object):
             pose_graph = self.chunk_posegraph_opt()
             node_num = len(pose_graph.nodes)
 
-            ### --- debug fragment visualization
-            local_tsdf_model = create_scaleable_TSDF(
-                voxel_size=self.tsdf_voxel_size,
-                sdf_trunc=3 * self.tsdf_voxel_size
-            )
-
-            for i in range(node_num):
-                rgbd = self.rgbd_dict[i]
-
-                pose = pose_graph.nodes[i].pose
-                pose = np.linalg.inv(pose)
-                local_tsdf_model.integrate(rgbd, self.instrinc, pose)
-
-            # # open3d.visualization.draw_geometries([local_tsdf_model.extract_point_cloud()])
-            open3d.io.write_point_cloud(
-                os.path.join('/home/quan/Desktop/template/cache', '%d_local.ply'%self.template_id),
-                local_tsdf_model.extract_point_cloud()
-            )
-            print('[DEBUG]: save template_id:%d'%self.template_id)
-            # self.template_id += 1
-            ### ------
+            # ### --- debug fragment visualization
+            # local_tsdf_model = create_scaleable_TSDF(
+            #     voxel_size=self.tsdf_voxel_size,
+            #     sdf_trunc=3 * self.tsdf_voxel_size
+            # )
+            #
+            # for i in range(node_num):
+            #     rgbd = self.rgbd_dict[i]
+            #
+            #     pose = pose_graph.nodes[i].pose
+            #     pose = np.linalg.inv(pose)
+            #     local_tsdf_model.integrate(rgbd, self.instrinc, pose)
+            #
+            # # # open3d.visualization.draw_geometries([local_tsdf_model.extract_point_cloud()])
+            # open3d.io.write_point_cloud(
+            #     os.path.join('/home/quan/Desktop/company/template', '%d_local.ply'%self.template_id),
+            #     local_tsdf_model.extract_point_cloud()
+            # )
+            # print('[DEBUG]: save template_id:%d'%self.template_id)
+            # # self.template_id += 1
+            # ### ------
 
             for i in range(node_num):
                 rgbd = self.rgbd_dict[i]
@@ -428,13 +428,13 @@ class PoseGraph_Chunk_Odometry(object):
 
                 self.tsdf_model.integrate(rgbd, self.instrinc, pose)
 
-            ### ------ debug
-            open3d.io.write_point_cloud(
-                os.path.join('/home/quan/Desktop/template/cache', '%d_tsdf.ply'%self.template_id),
-                self.tsdf_model.extract_point_cloud()
-            )
-            # self.template_id += 1
-            ### ---------
+            # ### ------ debug
+            # open3d.io.write_point_cloud(
+            #     os.path.join('/home/quan/Desktop/company/template', '%d_tsdf.ply'%self.template_id),
+            #     self.tsdf_model.extract_point_cloud()
+            # )
+            # # self.template_id += 1
+            # ### ---------
 
             self.odometry_orig = np.linalg.inv(pose_graph.nodes[node_num-1].pose).dot(self.odometry_orig)
             self.odometry_orig, remap_img = self.raycasting_icp(
@@ -466,15 +466,14 @@ class PoseGraph_Chunk_Odometry(object):
 
             # open3d.visualization.draw_geometries([template_pcd])
             open3d.io.write_point_cloud(
-                os.path.join('/home/quan/Desktop/template/cache', '%d_compare.ply'%self.template_id),
+                os.path.join('/home/quan/Desktop/company/template', '%d_compare.ply'%self.template_id),
                 template_pcd
             )
             self.template_id +=1
             ### ------------
 
-            self.rgbd_orig = rgbd_current
+            ### --- init
             self.pcd_orig = pcd_current
-
             self.rgbd_dict.clear()
             self.queue_id = 0
             assert self.queue.qsize()==0
@@ -484,12 +483,10 @@ class PoseGraph_Chunk_Odometry(object):
                     self.queue_id, rgbd_current, None, None, None, None
                 )
             )
-            self.queue_id += 1
 
             return_img = remap_img
 
-        ### do not forget this
-        self.rgbd_prev = rgbd_current
         self.pcd_prev = pcd_current
+        self.queue_id += 1
 
         return True, None, None, return_img
