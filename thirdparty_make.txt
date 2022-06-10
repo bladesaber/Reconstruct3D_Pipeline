@@ -55,3 +55,6 @@ make
 sudo make install
 sudo update-alternatives --install /usr/bin/cmake cmake /usr/local/bin/cmake 1 --force
 
+cvat public to LAN
+1.export CVAT_HOST=192.168.8.142
+2.sudo -E docker-compose up -d
