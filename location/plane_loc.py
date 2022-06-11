@@ -36,8 +36,6 @@ class Calibration_PoseFinder(object):
         self.coodr_prefix = np.array(self.coodr_prefix)
 
     def compute_axis(self, corner, dst_points):
-        ### todo 我的精度不够
-        ### opencv 的 src to dst 与我的相反
         homography, _ = cv2.findHomography(dst_points, corner, method=0)
 
         r1 = self.Kv.dot(homography[:, 0:1])
@@ -60,8 +58,8 @@ class Calibration_PoseFinder(object):
         rot = np.concatenate((r1, r2, r3), axis=1)
 
         ### todo ??
-        # U, S, V = np.linalg.svd(rot)
-        # rot = U.dot(V)
+        U, S, V = np.linalg.svd(rot)
+        rot = U.dot(V)
 
         RT = np.concatenate((rot, t.reshape((-1, 1))), axis=1)
 

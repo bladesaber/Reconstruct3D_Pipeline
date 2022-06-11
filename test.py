@@ -38,7 +38,6 @@ def compute_axis(corner, dst_points):
 
     return RT
 
-
 uv_array = np.array([
     [188.33858, 79.35309],
     [494.52295, 95.80984],
@@ -71,8 +70,21 @@ opoints = np.array([
 
 ]).astype(np.float32)
 
-K = np.concatenate([K, np.zeros((3,1))], axis=1)
+K = np.concatenate([K, np.zeros((3, 1))], axis=1)
 RT = np.concatenate((RT, np.array([[0., 0., 0., 1.]])), axis=0)
 ipoints = (K.dot(RT.dot(opoints.T))).T
-ipoints = ipoints[:, :2]/ipoints[:, -1:]
-print(ipoints)
+ipoints = ipoints[:, :2] / ipoints[:, -1:]
+
+img = cv2.imread('/home/quan/Desktop/company/Reconstruct3D_Pipeline/location/test.jpg')
+height, width, c = img.shape
+resize_width = 640
+resize_height = 480
+img = cv2.resize(img, (resize_width, resize_height))
+
+for p in ipoints:
+    x, y = p
+    x, y = int(x), int(y)
+    cv2.circle(img, (x, y), 4, (255, 0, 0), 2)
+
+cv2.imshow('d', img)
+cv2.waitKey(0)
