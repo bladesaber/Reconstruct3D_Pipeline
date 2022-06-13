@@ -3,7 +3,6 @@ import numpy as np
 import argparse
 from queue import Queue
 
-
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -57,7 +56,6 @@ class Calibration_PoseFinder(object):
         r3 = (np.cross(r1.T, r2.T)).reshape((-1, 1))
         rot = np.concatenate((r1, r2, r3), axis=1)
 
-        ### todo ??
         U, S, V = np.linalg.svd(rot)
         rot = U.dot(V)
 
