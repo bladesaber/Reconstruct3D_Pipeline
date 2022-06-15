@@ -91,6 +91,10 @@ def calibration_RT(camera):
 
             assert uv_array.shape[0] == pose_finder.coodr_prefix.shape[0]
             RT = pose_finder.compute_axis(corner=uv_array, dst_points=pose_finder.coodr_prefix)
+            # cv2.solvePnP(
+            #     objectPoints=pose_finder.coodr_prefix, imagePoints=uv_array,
+            #     cameraMatrix=pose_finder.K, distCoeffs=pose_finder.dcoeffs, flags=cv2.SOLVEPNP_ITERATIVE
+            # )
 
     cv2.destroyAllWindows()
 
@@ -112,7 +116,7 @@ if __name__ == '__main__':
     camera = Camera_RealSense()
 
     RT = calibration_RT(camera=camera)
-    print('[DEBUG]: RT ', RT)
+    print('[DEBUG] RT:\n', RT)
 
     object_pose_detection(camera=camera, RT=RT)
 
