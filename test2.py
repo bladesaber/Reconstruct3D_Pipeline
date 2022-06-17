@@ -1,62 +1,55 @@
-import cv2, os
-import numpy as np
+import os
+import shutil
+import cv2
 import matplotlib.pyplot as plt
 
+src_dir = '/home/quan/Desktop/company/dataset/shape/raw'
+mask_dir = '/home/quan/Desktop/company/dataset/shape/mask'
+img_dir = '/home/quan/Desktop/company/dataset/shape/image'
 
-def get_img(input_Path):
-    img_paths = []
-    for (path, dirs, files) in os.walk(input_Path):
-        for filename in files:
-            if filename.endswith(('.jpg', '.png')):
-                img_paths.append(path + '/' + filename)
-    return img_paths
+non_process = []
+# non_process = ['26.jpg', '11.jpg','27.jpg','23.jpg', '29.jpg', '38.jpg', '32.jpg', '4.jpg', '39.jpg']
+# non_process = ['39.jpg']
 
-# 构建Gabor滤波器
-def build_filters():
-    filters = []
-    ksize = [7, 9, 11, 13, 15, 17]
+if len(non_process)==0:
+    file_names = os.listdir(src_dir)
+else:
+    file_names = non_process
 
-    # gabor尺度，6个
-    lamda = np.pi/2.0
-    # 波长
-    for theta in np.arange(0, np.pi, np.pi / 4):
-        #gabor方向，0°，45°，90°，135°，共四个
-        for K in range(6):
-            kern = cv2.getGaborKernel((ksize[K], ksize[K]), 1.0, theta, lamda, 0.5, 0, ktype=cv2.CV_32F)
-            kern /= 1.5 * kern.sum()
-            filters.append(kern)
+for file_name in file_names:
+    print(file_name)
+    src_file = os.path.join(src_dir, file_name)
+    save_file_name = file_name
+    img_file = os.path.join(img_dir, save_file_name)
+    mask_file = os.path.join(mask_dir, save_file_name)
 
-    plt.figure(1)
-    # 用于绘制滤波器
-    for temp in range(len(filters)):
-        plt.subplot(4, 6, temp + 1)
-        plt.imshow(filters[temp])
-        plt.show()
-    return filters
+    img = cv2.imread(src_file)
 
-# Gabor特征提取
-def getGabor(img,filters):
-    res = []
-    # 滤波结果
-    for i in range(len(filters)):
-        res1 = process(img, filters[i])
-        accum = np.zeros_like(img)
+    # img = img[201:409, 0:210, :]
 
-        for kern in filters[i]:
-            fimg = cv2.filter2D(img, cv2.CV_8UC1, kern)
-            accum = np.maximum(accum, fimg, accum)
-        res.append(np.asarray(accum))
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    # _, mask = cv2.threshold(gray, 180, maxval=255, type=cv2.THRESH_BINARY)
 
-    # 用于绘制滤波效果
-    plt.figure(2)
-    for temp in range(len(res)):
-        plt.subplot(4, 6, temp + 1)
-        plt.imshow(res[temp], cmap='gray')
-    plt.show()
-    return res  # 返回滤波结果,结果为24幅图，按照gabor角度排列
+    # cv2.imwrite(img_file, img)
+    # cv2.imwrite(mask_file, mask)
 
-if __name__ == '__main__':
-    filters = build_filters()
-    ''' input_Path = './content' img_paths = get_img(input_Path) for img in img_paths: img = cv2.imread(img) getGabor(img, filters) '''
-    img = cv2.imread('/data1/input.png')
-    getGabor(img, filters)
+    filter_img = img.copy()
+    filter_img[mask!=255, :] = 0
+
+    cv2.imshow('rgb', img)
+    cv2.imshow('gray', gray)
+    cv2.imshow('filter', filter_img)
+    cv2.imshow('mask', mask)
+
+    key = cv2.waitKey(0)
+    if key==ord('s'):
+        # cv2.imwrite(img_file, img)
+        cv2.imwrite(img_file, filter_img)
+        cv2.imwrite(mask_file, mask)
+    elif key == ord('p'):
+        non_process.append(file_name)
+    elif key == ord('q'):
+        break
+
+print(non_process)
