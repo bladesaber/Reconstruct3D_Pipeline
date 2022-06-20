@@ -2,6 +2,8 @@ import os
 import cv2
 import random
 import numpy as np
+import imgaug.augmenters as iaa
+from typing import Dict
 
 from dataset_utils.aug_utils import random_polygon
 from dataset_utils.aug_utils import percentage_crop
@@ -21,16 +23,83 @@ from dataset_utils.aug_utils import draw_polygon
 '''
 
 class SimulateNoise_Dataset(object):
+    '''
+    pre_image:
+        JPEG_Compress, Blur, light_Blend, elastic_transform, rotate, translate, scale, crop
+        contrast, sharpen
+    noise_stage:
+        polygon_random_color, polygon_pure_color, polygon_noise_color
+        grip_black_corase, grip_color_corase, salt_pepper_black, salt_pepper_color
+        salt_pepper_noise, guassian_noise
+    '''
+
     def __init__(self, shape_dir, texture_dir):
         self.shape_dir = shape_dir
         self.texture_dir = texture_dir
         self.shape_paths = os.listdir(self.shape_dir)
         self.texture_paths = os.listdir(self.texture_dir)
 
-    def add_noise(self, image):
-        pass
+    def init_perImage_parser(self, config:Dict):
+        if 'jpeg_compress' in config.keys():
+            compression_min = config['jpeg_compress']['min']
+            compression_max = config['jpeg_compress']['max']
+            self.jpeg_parser = iaa.JpegCompression(compression=(compression_min, compression_max))
 
-    def polygon_randomNoise(self, image):
+        if 'guassian_blur' in config.keys():
+            blur_min = config['guassian_blur']['min']
+            blur_max = config['guassian_blur']['max']
+            self.blur_guass_parser = iaa.GaussianBlur(sigma=(blur_min, blur_max))
+
+        if 'light_Blend' in config.keys():
+            nb_rows = config['light_Blend']['nb_rows']
+            nb_cols = config['light_Blend']['nb_cols']
+            self.blend_parser = iaa.BlendAlphaRegularGrid(
+                nb_rows=nb_rows, nb_cols=nb_cols,
+                background=iaa.Multiply(0.7),
+                # alpha=[0.3, 0.7]
+            )
+
+        if 'elastic_transform' in config.keys():
+            alpha_min = config['elastic_transform']['min']
+            alpha_max = config['elastic_transform']['max']
+            self.elastic_parser = iaa.ElasticTransformation(alpha=(alpha_min, alpha_max), sigma=0.25)
+
+        if 'geometry' in config.keys():
+            rotate_min = config['geometry']['rotate_min']
+            rotate_max = config['geometry']['rotate_max']
+
+            translate_p = config['geometry']['translate']
+
+            scale_min = config['geometry']['scale_min']
+            scale_max = config['geometry']['scale_max']
+
+            self.geometry_parser = iaa.Affine(
+                rotate=(rotate_min, rotate_max),
+                translate_percent={"x": (-translate_p, translate_p), "y": (-translate_p, translate_p)},
+                scale={"x": (scale_min, scale_max), "y": (scale_min, scale_max)},
+            )
+
+        if 'contrast' in config.keys():
+            gamma_min = config['contrast']['gamma_min']
+            gamma_max = config['contrast']['gamma_max']
+            self.contrast_parser = iaa.GammaContrast((gamma_min, gamma_max))
+
+        if 'sharpen' in config.keys():
+            alpha_min = config['sharpen']['gamma_min']
+            alpha_max = config['sharpen']['gamma_max']
+            lightness_min = config['sharpen']['lightness_min']
+            lightness_max = config['sharpen']['lightness_max']
+            self.sharpen_parser = iaa.Sharpen(alpha=(alpha_min, alpha_max), lightness=(lightness_min, lightness_max))
+
+        if 'crop' in config.keys():
+            crop_p = config['crop']['p']
+            self.crop_parser = iaa.CropAndPad(percent=(-crop_p, crop_p))
+
+    def init_noiseImage_parser(self, config:Dict):
+        if 'corase' in config.keys():
+            pass
+
+    def polygon_randomNoise(self, image, method='random_color'):
         height, width, c = image.shape
 
         num_veter = random.randint(4, 12)
@@ -48,7 +117,14 @@ class SimulateNoise_Dataset(object):
 
         mask = points_to_mask(points, width=width, height=height)
         num_valid_points = (mask == 255).sum()
-        image[mask == 255, :] = (np.random.uniform(0, 255, size=(num_valid_points, 3))).astype(np.uint8)
+
+        if method=='random_color':
+            image[mask == 255, :] = (np.random.uniform(0, 255, size=(num_valid_points, 3))).astype(np.uint8)
+        elif method=='pure_color':
+            color = np.random.uniform(0, 255, size=(1, 3))
+            image[mask == 255, :] = (np.tile(color, [num_valid_points, 1])).astype(np.uint8)
+        else:
+            raise ValueError
 
         return image
 
@@ -119,6 +195,9 @@ class SimulateNoise_Dataset(object):
         image = cv2.addWeighted(front_img, alpha=1.0 - weight, src2=image, beta=weight, gamma=0.0)
 
         return image
+
+    def grip_mask(self, image):
+        pass
 
 if __name__ == '__main__':
     dataset = SimulateNoise_Dataset(
