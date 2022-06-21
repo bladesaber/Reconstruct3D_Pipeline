@@ -3,7 +3,7 @@ jpeg_compress:
   max: 60
 guassian_blur:
   min: 1.0
-  max: 5.0
+  max: 3.0
 light_Blend:
   nb_rows_min: 5
   nb_rows_max: 10
@@ -11,7 +11,7 @@ light_Blend:
   nb_cols_max: 10
 geometry:
   rotate_min: 0.0
-  rotate_max: 350.0
+  rotate_max: 20.0
   translate: 0.1
   scale_min: 0.9
   scale_max: 1.1

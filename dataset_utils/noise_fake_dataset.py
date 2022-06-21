@@ -208,10 +208,11 @@ class SimulateNoise_Dataset(object):
 
         noise_parser_list = []
         if random.uniform(0.0, 1.0) > 0.25:
-            sample_num = random.randint(1, 2)
-            noise_parser = np.random.choice(self.noise_group, size=sample_num, replace=False)
-            # noise_parser = random.choice(self.noise_group)
-            noise_parser_list.extend(noise_parser)
+            # sample_num = random.randint(1, 2)
+            # noise_parser = np.random.choice(self.noise_group, size=sample_num, replace=False)
+            # noise_parser_list.extend(noise_parser)
+            noise_parser = random.choice(self.noise_group)
+            noise_parser_list.append(noise_parser)
 
         # ### debug
         # for i in perImg_parser_list:
