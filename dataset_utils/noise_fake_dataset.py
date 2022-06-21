@@ -4,9 +4,9 @@ import random
 import numpy as np
 import imgaug.augmenters as iaa
 from typing import Dict
+import yaml
 
 from dataset_utils.aug_utils import random_polygon
-from dataset_utils.aug_utils import percentage_crop
 from dataset_utils.aug_utils import points_to_mask
 from dataset_utils.aug_utils import draw_polygon
 
@@ -33,37 +33,62 @@ class SimulateNoise_Dataset(object):
         salt_pepper_noise, guassian_noise
     '''
 
-    def __init__(self, shape_dir, texture_dir):
-        self.shape_dir = shape_dir
-        self.texture_dir = texture_dir
-        self.shape_paths = os.listdir(self.shape_dir)
-        self.texture_paths = os.listdir(self.texture_dir)
+    def __init__(
+            self,
+            # shape_dir,
+            # texture_dir
+            config_path,
+    ):
+        # self.shape_dir = shape_dir
+        # self.texture_dir = texture_dir
+        # self.shape_paths = os.listdir(self.shape_dir)
+        # self.texture_paths = os.listdir(self.texture_dir)
+
+        with open(config_path, 'r') as f:
+            self.config = yaml.load(f, yaml.FullLoader)
+
+        self.init_perImage_parser(config=self.config)
+        self.init_noiseImage_parser(config=self.config)
 
     def init_perImage_parser(self, config:Dict):
+
+        shuttle_p = config['color_shuttle']['p']
+        self.channel_shuttle_parser = iaa.ChannelShuffle(p=shuttle_p)
+
+        ### --------------------------------------------------
+        self.group_rich_img = []
         if 'jpeg_compress' in config.keys():
             compression_min = config['jpeg_compress']['min']
             compression_max = config['jpeg_compress']['max']
             self.jpeg_parser = iaa.JpegCompression(compression=(compression_min, compression_max))
+            self.group_rich_img.append(self.jpeg_parser)
 
         if 'guassian_blur' in config.keys():
             blur_min = config['guassian_blur']['min']
             blur_max = config['guassian_blur']['max']
             self.blur_guass_parser = iaa.GaussianBlur(sigma=(blur_min, blur_max))
+            self.group_rich_img.append(self.blur_guass_parser)
 
         if 'light_Blend' in config.keys():
-            nb_rows = config['light_Blend']['nb_rows']
-            nb_cols = config['light_Blend']['nb_cols']
+            nb_rows_min = config['light_Blend']['nb_rows_min']
+            nb_rows_max = config['light_Blend']['nb_rows_max']
+            nb_cols_min = config['light_Blend']['nb_cols_min']
+            nb_cols_max = config['light_Blend']['nb_cols_max']
             self.blend_parser = iaa.BlendAlphaRegularGrid(
-                nb_rows=nb_rows, nb_cols=nb_cols,
+                nb_rows=(nb_rows_min, nb_rows_max),
+                nb_cols=(nb_cols_min, nb_cols_max),
                 background=iaa.Multiply(0.7),
                 # alpha=[0.3, 0.7]
             )
+            self.group_rich_img.append(self.blend_parser)
 
-        if 'elastic_transform' in config.keys():
-            alpha_min = config['elastic_transform']['min']
-            alpha_max = config['elastic_transform']['max']
-            self.elastic_parser = iaa.ElasticTransformation(alpha=(alpha_min, alpha_max), sigma=0.25)
+        # if 'elastic_transform' in config.keys():
+        #     alpha_min = config['elastic_transform']['min']
+        #     alpha_max = config['elastic_transform']['max']
+        #     self.elastic_parser = iaa.ElasticTransformation(alpha=(alpha_min, alpha_max), sigma=0.25)
 
+        ### --------------------------------------------------
+        self.group_geometry = []
         if 'geometry' in config.keys():
             rotate_min = config['geometry']['rotate_min']
             rotate_max = config['geometry']['rotate_max']
@@ -78,26 +103,124 @@ class SimulateNoise_Dataset(object):
                 translate_percent={"x": (-translate_p, translate_p), "y": (-translate_p, translate_p)},
                 scale={"x": (scale_min, scale_max), "y": (scale_min, scale_max)},
             )
-
-        if 'contrast' in config.keys():
-            gamma_min = config['contrast']['gamma_min']
-            gamma_max = config['contrast']['gamma_max']
-            self.contrast_parser = iaa.GammaContrast((gamma_min, gamma_max))
-
-        if 'sharpen' in config.keys():
-            alpha_min = config['sharpen']['gamma_min']
-            alpha_max = config['sharpen']['gamma_max']
-            lightness_min = config['sharpen']['lightness_min']
-            lightness_max = config['sharpen']['lightness_max']
-            self.sharpen_parser = iaa.Sharpen(alpha=(alpha_min, alpha_max), lightness=(lightness_min, lightness_max))
+            self.group_geometry.append(self.geometry_parser)
 
         if 'crop' in config.keys():
             crop_p = config['crop']['p']
             self.crop_parser = iaa.CropAndPad(percent=(-crop_p, crop_p))
+            self.group_geometry.append(self.crop_parser)
+
+        ### -------------------------------------------------
+        self.group_condition_adapt = []
+        if 'contrast' in config.keys():
+            gamma_min = config['contrast']['gamma_min']
+            gamma_max = config['contrast']['gamma_max']
+            self.contrast_parser = iaa.GammaContrast((gamma_min, gamma_max))
+            self.group_condition_adapt.append(self.contrast_parser)
+
+        if 'sharpen' in config.keys():
+            alpha_min = config['sharpen']['alpha_min']
+            alpha_max = config['sharpen']['alpha_max']
+            lightness_min = config['sharpen']['lightness_min']
+            lightness_max = config['sharpen']['lightness_max']
+            self.sharpen_parser = iaa.Sharpen(alpha=(alpha_min, alpha_max), lightness=(lightness_min, lightness_max))
+            self.group_condition_adapt.append(self.sharpen_parser)
 
     def init_noiseImage_parser(self, config:Dict):
-        if 'corase' in config.keys():
-            pass
+        self.noise_group = []
+
+        if 'corase_black' in config.keys():
+            pmin = config['corase_black']['pmin']
+            pmax = config['corase_black']['pmax']
+            self.corase_black_parser = iaa.CoarseDropout(p=(pmin, pmax), size_percent=(0.3, 0.6))
+            self.noise_group.append(self.corase_black_parser)
+
+        if 'corase_color' in config.keys():
+            pmin = config['corase_color']['pmin']
+            pmax = config['corase_color']['pmax']
+            self.corase_color_parser = iaa.CoarseDropout(p=(pmin, pmax), size_percent=(0.3, 0.6), per_channel=True)
+            self.noise_group.append(self.corase_color_parser)
+
+        if 'cutout_constant' in config.keys():
+            n_iter_min = config['cutout_constant']['n_iter_min']
+            n_iter_max = config['cutout_constant']['n_iter_max']
+            size_min = config['cutout_constant']['size_min']
+            size_max = config['cutout_constant']['size_max']
+            self.cutout_constant_parser = iaa.Cutout(
+                nb_iterations=(n_iter_min, n_iter_max),
+                size=(size_min, size_max),
+                fill_mode="constant",
+                cval=(0, 255),
+                fill_per_channel=0.5
+            )
+            self.noise_group.append(self.cutout_constant_parser)
+
+        if 'saltAndpepper_black' in config.keys():
+            pmin = config['saltAndpepper_black']['pmin']
+            pmax = config['saltAndpepper_black']['pmax']
+            self.saltAndpepper_black_parser = iaa.CoarseSaltAndPepper((pmin, pmax), size_percent=(0.3, 0.6))
+            self.noise_group.append(self.saltAndpepper_black_parser)
+
+        if 'saltAndpepper_color' in config.keys():
+            pmin = config['saltAndpepper_color']['pmin']
+            pmax = config['saltAndpepper_color']['pmax']
+            self.saltAndpepper_color_parser = iaa.CoarseSaltAndPepper((pmin, pmax), size_percent=(0.3, 0.6), per_channel=True)
+            self.noise_group.append(self.saltAndpepper_color_parser)
+
+        if 'cutout_guass' in config.keys():
+            n_iter_min = config['cutout_guass']['n_iter_min']
+            n_iter_max = config['cutout_guass']['n_iter_max']
+            size_min = config['cutout_guass']['size_min']
+            size_max = config['cutout_guass']['size_max']
+            self.cutout_guass_parser = iaa.Cutout(
+                nb_iterations=(n_iter_min, n_iter_max),
+                size=(size_min, size_max),
+                fill_mode="gaussian",
+                fill_per_channel=True
+            )
+            self.noise_group.append(self.cutout_guass_parser)
+
+    def aug_image(self, image):
+        ndim = image.ndim
+
+        perImg_parser_list = []
+
+        if random.uniform(0.0, 1.0) > 0.5:
+            perImg_parser_list.append(self.channel_shuttle_parser)
+
+        if random.uniform(0.0, 1.0) > 0.5:
+            rich_parser = random.choice(self.group_rich_img)
+            perImg_parser_list.append(rich_parser)
+
+        if random.uniform(0.0, 1.0) > 0.5:
+            geometry_parser = random.choice(self.group_geometry)
+            perImg_parser_list.append(geometry_parser)
+
+        if random.uniform(0.0, 1.0) > 0.5:
+            condition_parser = random.choice(self.group_condition_adapt)
+            perImg_parser_list.append(condition_parser)
+
+        if random.uniform(0.0, 1.0) > 0.5:
+            noise_parser = random.choice(self.noise_group)
+            perImg_parser_list.append(noise_parser)
+
+        ### debug
+        for i in perImg_parser_list:
+            print(i)
+
+        if len(perImg_parser_list)>0:
+            parser = iaa.Sequential(perImg_parser_list, random_order=True)
+
+            if ndim == 3:
+                image = image[np.newaxis, ...]
+                image = parser(images=image)
+                image = image[0, ...]
+            elif ndim ==4:
+                image = parser(images=image)
+            else:
+                raise ValueError
+
+        return image
 
     def polygon_randomNoise(self, image, method='random_color'):
         height, width, c = image.shape
@@ -196,19 +319,18 @@ class SimulateNoise_Dataset(object):
 
         return image
 
-    def grip_mask(self, image):
-        pass
-
 if __name__ == '__main__':
     dataset = SimulateNoise_Dataset(
-        shape_dir='/home/quan/Desktop/company/dataset/shape/mask',
-        texture_dir='/home/quan/Desktop/company/dataset/texture'
+        # shape_dir='/home/quan/Desktop/company/dataset/shape/mask',
+        # texture_dir='/home/quan/Desktop/company/dataset/texture',
+        config_path='/home/quan/Desktop/company/Reconstruct3D_Pipeline/dataset_utils/test_config.yaml'
     )
 
     car_img = cv2.imread('/home/quan/Desktop/company/car_data/1_3.jpg')
-    # car_img = dataset.polygon_randomNoise(image=car_img)
+    # car_img = dataset.polygon_randomNoise(image=car_img, method='pure_color')
     # car_img = dataset.shape_randomTexture(image=car_img)
-    car_img = dataset.polygon_randomTexture(image=car_img)
+    # car_img = dataset.polygon_randomTexture(image=car_img)
+    car_img = dataset.aug_image(image=car_img)
 
     cv2.imshow('d', car_img)
     cv2.waitKey(0)

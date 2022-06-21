@@ -1,9 +1,8 @@
 import pandas as pd
 import numpy as np
+import yaml
+import random
 
-a = np.array([
-    [1, 0],
-    [1, 0]
-])
+a = np.random.random((10, 25, 3))
+print(a.ndim)
 
-print(np.where(a==1))

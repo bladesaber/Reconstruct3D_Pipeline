@@ -425,5 +425,20 @@ def test_polygon_mask():
     cv2.imshow('d', car_img)
     cv2.waitKey(0)
 
-# if __name__ == '__main__':
-#     test_polygon_mask()
+if __name__ == '__main__':
+    # test_polygon_mask()
+
+    image = cv2.imread('/home/quan/Desktop/company/car_data/1_1.jpg')
+
+    parser = iaa.ChannelShuffle(p=1.0)
+    parser = iaa.Sequential([parser])
+
+    if len(image.shape) == 3:
+        image = image[np.newaxis, ...]
+        image = parser(images=image)
+        image = image[0, ...]
+    else:
+        image = parser(images=image)
+
+    cv2.imshow('d', image)
+    cv2.waitKey(0)
