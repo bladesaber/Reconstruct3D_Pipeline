@@ -182,6 +182,12 @@ class SimulateNoise_Dataset(object):
 
     def aug_image(self, image):
         ndim = image.ndim
+        assert ndim in [3, 4]
+        if ndim == 3:
+            image = image[np.newaxis, ...]
+            change_dim = True
+        else:
+            change_dim = False
 
         perImg_parser_list = []
 
@@ -200,27 +206,31 @@ class SimulateNoise_Dataset(object):
             condition_parser = random.choice(self.group_condition_adapt)
             perImg_parser_list.append(condition_parser)
 
-        if random.uniform(0.0, 1.0) > 0.5:
-            noise_parser = random.choice(self.noise_group)
-            perImg_parser_list.append(noise_parser)
+        noise_parser_list = []
+        if random.uniform(0.0, 1.0) > 0.25:
+            sample_num = random.randint(1, 2)
+            noise_parser = np.random.choice(self.noise_group, size=sample_num, replace=False)
+            # noise_parser = random.choice(self.noise_group)
+            noise_parser_list.extend(noise_parser)
 
-        ### debug
-        for i in perImg_parser_list:
-            print(i)
+        # ### debug
+        # for i in perImg_parser_list:
+        #     print(i)
 
         if len(perImg_parser_list)>0:
-            parser = iaa.Sequential(perImg_parser_list, random_order=True)
+            perImg_parser = iaa.Sequential(perImg_parser_list, random_order=True)
+            image = perImg_parser(images=image)
 
-            if ndim == 3:
-                image = image[np.newaxis, ...]
-                image = parser(images=image)
-                image = image[0, ...]
-            elif ndim ==4:
-                image = parser(images=image)
-            else:
-                raise ValueError
+        noise_image = image.copy()
+        if len(noise_parser_list)>0:
+            noise_parser = iaa.Sequential(noise_parser_list, random_order=True)
+            noise_image = noise_parser(images=noise_image.copy())
 
-        return image
+        if change_dim:
+            image = image[0, ...]
+            noise_image = noise_image[0, ...]
+
+        return image, noise_image
 
     def polygon_randomNoise(self, image, method='random_color'):
         height, width, c = image.shape
@@ -330,7 +340,8 @@ if __name__ == '__main__':
     # car_img = dataset.polygon_randomNoise(image=car_img, method='pure_color')
     # car_img = dataset.shape_randomTexture(image=car_img)
     # car_img = dataset.polygon_randomTexture(image=car_img)
-    car_img = dataset.aug_image(image=car_img)
+    car_img, car_img_noise = dataset.aug_image(image=car_img)
 
     cv2.imshow('d', car_img)
+    cv2.imshow('noise', car_img_noise)
     cv2.waitKey(0)
