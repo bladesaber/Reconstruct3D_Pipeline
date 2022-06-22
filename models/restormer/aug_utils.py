@@ -144,66 +144,6 @@ def random_polygon(num_points, min_length, max_length):
     points = np.array(points)
     return points
 
-def random_mask(image, p=0.05, method='zero'):
-    if method=='zero':
-        corase_parser = iaa.CoarseDropout(p=p, size_percent=(0.2, 0.5))
-
-    elif method=='color':
-        corase_parser = iaa.CoarseDropout(p=p, size_percent=(0.2, 0.5), per_channel=True)
-
-    elif method=='saltPepper':
-        corase_parser = iaa.CoarseSaltAndPepper(p=p, size_percent=(0.2, 0.5))
-
-    elif method=='saltPepper_color':
-        corase_parser = iaa.CoarseSaltAndPepper(p=p, size_percent=(0.2, 0.5), per_channel=True)
-
-    else:
-        raise ValueError('Unsupport Method')
-
-    parser = iaa.Sequential([corase_parser])
-
-    if len(image.shape)==3:
-        image = image[np.newaxis, ...]
-        image = parser(images=image)
-        image = image[0, ...]
-    else:
-        image = parser(images=image)
-
-    return image
-
-def random_blend(image, nb_rows=30, nb_cols=15, alpha=0.7):
-    ### 在image restoration使用中，要考虑变换后的图像是否应该作为目标图像
-    blend_parser = iaa.BlendAlphaRegularGrid(
-        nb_rows=nb_rows, nb_cols=nb_cols,
-        background=iaa.Multiply(alpha),
-        alpha=[0.3, 0.7]
-    )
-
-    parser = iaa.Sequential([blend_parser])
-
-    if len(image.shape) == 3:
-        image = image[np.newaxis, ...]
-        image = parser(images=image)
-        image = image[0, ...]
-    else:
-        image = parser(images=image)
-
-    return image
-
-def random_compress(image, compression=(30, 80)):
-    compress_parser = iaa.JpegCompression(compression=compression)
-
-    parser = iaa.Sequential([compress_parser])
-
-    if len(image.shape) == 3:
-        image = image[np.newaxis, ...]
-        image = parser(images=image)
-        image = image[0, ...]
-    else:
-        image = parser(images=image)
-
-    return image
-
 def random_elastic(image, alpha=0.5):
     elastic_parser = iaa.ElasticTransformation(alpha=alpha, sigma=0.25)
 
@@ -245,41 +185,6 @@ def random_weather(image, method='rain'):
 
 def random_blur(image, ksize=5):
     image = cv2.blur(image, (ksize, ksize))
-    return image
-
-def random_crop(image):
-    crop_parser = iaa.CropAndPad(percent=(-0.25, 0.25))
-
-    parser = iaa.Sequential([crop_parser])
-
-    if len(image.shape) == 3:
-        image = image[np.newaxis, ...]
-        image = parser(images=image)
-        image = image[0, ...]
-    else:
-        image = parser(images=image)
-
-    return image
-
-def random_geometry(image, method='scale'):
-    if method=='rotate':
-        geometry_parser = iaa.Rotate((-20, 20))
-    elif method=='translate':
-        geometry_parser = iaa.Affine(translate_percent={"x": (-0.1, 0.1), "y": (-0.1, 0.1)})
-    elif method=='scale':
-        geometry_parser = iaa.Affine(scale={"x": (0.85, 1.15), "y": (0.85, 1.15)})
-    else:
-        raise ValueError
-
-    parser = iaa.Sequential([geometry_parser])
-
-    if len(image.shape) == 3:
-        image = image[np.newaxis, ...]
-        image = parser(images=image)
-        image = image[0, ...]
-    else:
-        image = parser(images=image)
-
     return image
 
 def draw_polygon(image, points, color=(255, 0, 0)):

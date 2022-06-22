@@ -1,14 +1,15 @@
 import os
 import cv2
-import random
-import numpy as np
-import imgaug.augmenters as iaa
-from typing import Dict
+import torch
 import yaml
+import random
+import imgaug.augmenters as iaa
+from torch.utils.data import Dataset
+from typing import Dict
+import numpy as np
 
-from dataset_utils.aug_utils import random_polygon
-from dataset_utils.aug_utils import points_to_mask
-from dataset_utils.aug_utils import draw_polygon
+from models.restormer.aug_utils import random_polygon
+from models.restormer.aug_utils import points_to_mask
 
 '''
 2022-06-20
@@ -22,7 +23,7 @@ from dataset_utils.aug_utils import draw_polygon
 	4.但这个方法是有一定的缺陷的，因为部分目标图像是虚假的，这就导致了误差是不可能从根本上收敛到目标的。
 '''
 
-class SimulateNoise_Dataset(object):
+class SimulateNoise_Parser(object):
     '''
     pre_image:
         JPEG_Compress, Blur, light_Blend, elastic_transform, rotate, translate, scale, crop
@@ -37,16 +38,14 @@ class SimulateNoise_Dataset(object):
             self,
             # shape_dir,
             # texture_dir
-            config_path,
+            config,
     ):
         # self.shape_dir = shape_dir
         # self.texture_dir = texture_dir
         # self.shape_paths = os.listdir(self.shape_dir)
         # self.texture_paths = os.listdir(self.texture_dir)
 
-        with open(config_path, 'r') as f:
-            self.config = yaml.load(f, yaml.FullLoader)
-
+        self.config = config
         self.init_perImage_parser(config=self.config)
         self.init_noiseImage_parser(config=self.config)
 
@@ -330,19 +329,94 @@ class SimulateNoise_Dataset(object):
 
         return image
 
+class Dataset_PairedImage(Dataset):
+
+    def __init__(self, img_dir, config):
+        super(Dataset_PairedImage, self).__init__()
+
+        self.img_dir = img_dir
+        self.img_paths = os.listdir(self.img_dir)
+
+        self.config = config
+        self.img_width = self.config['image_width']
+        self.img_height = self.config['image_height']
+        self.parser = SimulateNoise_Parser(config=self.config)
+
+    def __getitem__(self, index):
+        # index = index % len(self.img_paths)
+
+        img_path = self.img_paths[index]
+        img_name = img_path
+
+        img = cv2.imread(os.path.join(self.img_dir, img_path))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = cv2.resize(img, (self.img_width, self.img_height))
+
+        # h, w, c = img.shape
+        # assert c==3
+        # assert h==self.img_height
+        # assert w==self.img_width
+
+        gt_image, noise_image = self.parser.aug_image(image=img)
+
+        gt_image = gt_image.astype(np.float32)
+        noise_image = noise_image.astype(np.float32)
+
+        ### todo 需不需要归一化??
+        gt_image = self.normalize(gt_image)
+        noise_image = self.normalize(noise_image)
+
+        gt_image = np.transpose(gt_image, (2, 0, 1))
+        gt_image = torch.from_numpy(gt_image)
+
+        noise_image = np.transpose(noise_image, (2, 0, 1))
+        noise_image = torch.from_numpy(noise_image)
+
+        return noise_image, gt_image, img_name
+        # return {'noise': noise_image, 'gt':gt_image, 'name':img_name}
+
+    def normalize(self, img):
+        img_mean = np.mean(img, axis=(0, 1), keepdims=True)
+        img_var = np.var(img, axis=(0, 1), keepdims=True)
+        img_std = np.sqrt(img_var)
+        return (img - img_mean)/img_std
+
+    def __len__(self):
+        return len(self.img_paths)
+
+    def get_names(self):
+        return self.img_paths
+
+    def re_normalize(self, img):
+        img_min = np.min(img, axis=(0, 1), keepdims=True)
+        img_max = np.max(img, axis=(0, 1), keepdims=True)
+
+        return ((img - img_min)/(img_max-img_min) * 255.).astype(np.uint8)
+
 if __name__ == '__main__':
-    dataset = SimulateNoise_Dataset(
-        # shape_dir='/home/quan/Desktop/company/dataset/shape/mask',
-        # texture_dir='/home/quan/Desktop/company/dataset/texture',
-        config_path='/home/quan/Desktop/company/Reconstruct3D_Pipeline/dataset_utils/test_config.yaml'
+    config_path = '/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/restormer/test_config.yaml'
+    with open(config_path, 'r') as f:
+        config = yaml.load(f, yaml.FullLoader)
+    dataset = Dataset_PairedImage(
+        img_dir='/home/quan/Desktop/tempary/temp/good',
+        config=config['dataset']
     )
 
-    car_img = cv2.imread('/home/quan/Desktop/company/car_data/1_3.jpg')
-    # car_img = dataset.polygon_randomNoise(image=car_img, method='pure_color')
-    # car_img = dataset.shape_randomTexture(image=car_img)
-    # car_img = dataset.polygon_randomTexture(image=car_img)
-    car_img, car_img_noise = dataset.aug_image(image=car_img)
+    for batch in dataset:
+        noise_image, gt_image, name = batch
+        noise_image = noise_image.numpy()
+        noise_image = np.transpose(noise_image, (1,2,0))
+        noise_image = dataset.re_normalize(noise_image)
+        noise_image = cv2.cvtColor(noise_image, cv2.COLOR_BGR2RGB)
 
-    cv2.imshow('d', car_img)
-    cv2.imshow('noise', car_img_noise)
-    cv2.waitKey(0)
+        gt_image = gt_image.numpy()
+        gt_image = np.transpose(gt_image, (1, 2, 0))
+        gt_image = dataset.re_normalize(gt_image)
+        gt_image = cv2.cvtColor(gt_image, cv2.COLOR_BGR2RGB)
+
+        print(name)
+        cv2.imshow('gt', gt_image)
+        cv2.imshow('noise', noise_image)
+        cv2.waitKey(0)
+
+        break

@@ -1,0 +1,74 @@
+jpg_path: '/home/quan/Desktop/tempary/temp/good'
+
+network:
+  input_dim: 3
+  out_dim: 3
+  embed_dim: 48
+  num_blocks:
+    - 4
+    - 6
+    - 6
+    - 8
+  heads:
+    - 1
+    - 2
+    - 4
+    - 8
+  ffn_expansion_factor: 2
+  bias: true
+  dual_pixel_task: false
+
+dataset:
+  image_width: 352
+  image_height: 256
+  jpeg_compress:
+    min: 0
+    max: 60
+  guassian_blur:
+    min: 1.0
+    max: 3.0
+  light_Blend:
+    nb_rows_min: 5
+    nb_rows_max: 10
+    nb_cols_min: 5
+    nb_cols_max: 10
+  geometry:
+    rotate_min: 0.0
+    rotate_max: 20.0
+    translate: 0.1
+    scale_min: 0.9
+    scale_max: 1.1
+  contrast:
+    gamma_min: 0.5
+    gamma_max: 2.0
+  sharpen:
+    alpha_min: 0.1
+    alpha_max: 0.9
+    lightness_min: 0.5
+    lightness_max: 1.5
+  crop:
+    p: 0.15
+  corase_black:
+    pmin: 0.01
+    pmax: 0.12
+  corase_color:
+    pmin: 0.01
+    pmax: 0.12
+  cutout_constant:
+    n_iter_min: 1
+    n_iter_max: 3
+    size_min: 0.05
+    size_max: 0.2
+  saltAndpepper_black:
+    pmin: 0.01
+    pmax: 0.12
+  saltAndpepper_color:
+    pmin: 0.01
+    pmax: 0.12
+  cutout_guass:
+    n_iter_min: 1
+    n_iter_max: 3
+    size_min: 0.05
+    size_max: 0.2
+  color_shuttle:
+    p: 1.0
