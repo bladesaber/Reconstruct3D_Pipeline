@@ -4,14 +4,10 @@ import cv2
 import time
 import random
 import numpy as np
+import albumentations as albu
 
-src_dir = '/home/quan/Desktop/tempary/temp/good'
-paths = os.listdir(src_dir)
-
-vis = visdom.Visdom()
-while True:
-    path = random.choice(paths)
-    img = cv2.imread(os.path.join(src_dir, path))
-    img = np.transpose(img, (2, 0, 1))
-    vis.image(img, win='img')
-    time.sleep(1.0)
+transform = albu.Compose([
+    albu.RandomCrop(width=256, height=256),
+    albu.HorizontalFlip(p=0.5),
+    albu.RandomBrightnessContrast(p=0.2),
+])

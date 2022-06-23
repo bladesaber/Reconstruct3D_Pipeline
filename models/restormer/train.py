@@ -7,12 +7,14 @@ import datetime
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn.utils import clip_grad
 import numpy as np
+import time
 
 from models.restormer.restormer import Restormer
 from models.restormer.utils import setup_optimizers
 from models.restormer.dataset_utils import Dataset_PairedImage
 from models.restormer.dataloader_utils import Group_DataLoader
 from models.restormer.utils import Last_Saver
+from models.restormer.logger import Logger_Visdom
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
@@ -45,10 +47,12 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def re_normalize(imgs):
+def re_normalize(imgs, num=10):
     imgs = np.transpose(imgs, (0, 2, 3, 1))
     re_normalize_imgs = []
-    for idx in range(imgs.shape[0]):
+    select_idx = np.random.choice(np.arange(0, imgs.shape[0], 1), size=num)
+
+    for idx in select_idx:
         img = imgs[idx, ...]
         img_min = np.min(img, axis=(0, 1), keepdims=True)
         img_max = np.max(img, axis=(0, 1), keepdims=True)
@@ -117,6 +121,9 @@ def train():
             path=os.path.join(args.save_dir, 'checkpoints', "model_last.pth"),
             meta=time_tag
         )
+        vidsom_logger = Logger_Visdom()
+
+        log_time = time.time()
 
         epoch = 0
         step = 0
@@ -138,8 +145,11 @@ def train():
 
                 loss, rimgs = network.train_step(noise_img=noise_images, gt_img=gt_images)
 
-                validate_img = rimgs.cpu().numpy()
-
+                if time.time() - log_time>1.0:
+                    validate_img = rimgs.cpu().numpy()
+                    for name_idx, valid_img in enumerate(re_normalize(validate_img)):
+                        vidsom_logger.log_img(valid_img, name='%d'%name_idx)
+                    log_time = time.time()
 
                 loss.backward()
                 if step % args.accumulate == 0:

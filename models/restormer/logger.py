@@ -1,4 +1,6 @@
 from tensorboardX import SummaryWriter
+import visdom
+import numpy as np
 
 class Logger_Tensorboard(object):
     def __init__(self, log_dir):
@@ -17,3 +19,11 @@ class Logger_Tensorboard(object):
 
     def histogram_summary(self, tag, value):
         self.tb_writer.add_histogram(tag, value, 0)
+
+class Logger_Visdom(object):
+    def __init__(self):
+        self.vis = visdom.Visdom()
+
+    def log_img(self, image, name):
+        image = np.transpose(image, (2, 0, 1))
+        self.vis.image(image, win=name)
