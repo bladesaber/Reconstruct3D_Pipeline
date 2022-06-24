@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument('--accumulate', type=int, default=1)
     parser.add_argument('--max_epoches', type=int, default=300)
 
-    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--batch_size', type=int, default=3)
     parser.add_argument('--lr_update_patient', type=int, default=10)
 
     parser.add_argument('--clip_grad', type=int, default=0)
@@ -47,19 +47,12 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def re_normalize(imgs, num=10):
-    imgs = np.transpose(imgs, (0, 2, 3, 1))
-    re_normalize_imgs = []
-    select_idx = np.random.choice(np.arange(0, imgs.shape[0], 1), size=num)
+def re_normalize(img):
+    img_min = np.min(img, axis=(0, 1), keepdims=True)
+    img_max = np.max(img, axis=(0, 1), keepdims=True)
+    img =((img - img_min)/(img_max-img_min) * 255.).astype(np.uint8)
 
-    for idx in select_idx:
-        img = imgs[idx, ...]
-        img_min = np.min(img, axis=(0, 1), keepdims=True)
-        img_max = np.max(img, axis=(0, 1), keepdims=True)
-        img =((img - img_min)/(img_max-img_min) * 255.).astype(np.uint8)
-        re_normalize_imgs.append(img)
-
-    return re_normalize_imgs
+    return img
 
 def train():
     args = parse_args()
@@ -146,9 +139,20 @@ def train():
                 loss, rimgs = network.train_step(noise_img=noise_images, gt_img=gt_images)
 
                 if time.time() - log_time>1.0:
-                    validate_img = rimgs.cpu().numpy()
-                    for name_idx, valid_img in enumerate(re_normalize(validate_img)):
-                        vidsom_logger.log_img(valid_img, name='%d'%name_idx)
+                    validate_img = rimgs.cpu().detach().numpy()
+                    validate_img = np.transpose(validate_img, (0, 2, 3, 1))
+
+                    noise_images_np = noise_images.cpu().detach().numpy()
+                    noise_images_np = np.transpose(noise_images_np, (0, 2, 3, 1))
+
+                    select_idx = np.random.choice(np.arange(0, validate_img.shape[0], 1), size=4)
+
+                    for name_idx in select_idx:
+                        vidsom_logger.log_img(re_normalize(validate_img[name_idx, ...]),
+                                              name='reconstract_%d'%name_idx)
+                        vidsom_logger.log_img(re_normalize(noise_images_np[name_idx, ...]),
+                                              name='noise_%d' % name_idx)
+
                     log_time = time.time()
 
                 loss.backward()

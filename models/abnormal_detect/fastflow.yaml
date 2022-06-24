@@ -10,8 +10,8 @@ dataset:
   split_ratio: 0.2
   task: segmentation
   image_size: 224 # options: [256, 256, 448, 384] - for each supported backbone
-  train_batch_size: 8
-  test_batch_size: 8
+  train_batch_size: 4
+  test_batch_size: 4
   num_workers: 8
   transform_config:
     train: /home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/fast_transformer.yaml
@@ -27,8 +27,8 @@ dataset:
 
 model:
   name: fastflow
-#  backbone: resnet18 # options: [resnet18, wide_resnet50_2, cait_m48_448, deit_base_distilled_patch16_384]
-  backbone: wide_resnet50_2
+  backbone: resnet18 # options: [resnet18, wide_resnet50_2, cait_m48_448, deit_base_distilled_patch16_384]
+#  backbone: wide_resnet50_2
   flow_steps: 8 # options: [8, 8, 20, 20] - for each supported backbone
   hidden_ratio: 1.0 # options: [1.0, 1.0, 0.16, 0.16] - for each supported backbone
   conv3x3_only: True # options: [True, False, False, False] - for each supported backbone

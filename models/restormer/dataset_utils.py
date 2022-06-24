@@ -206,12 +206,14 @@ class SimulateNoise_Parser(object):
             perImg_parser_list.append(condition_parser)
 
         noise_parser_list = []
-        if random.uniform(0.0, 1.0) > 0.25:
-            # sample_num = random.randint(1, 2)
-            # noise_parser = np.random.choice(self.noise_group, size=sample_num, replace=False)
-            # noise_parser_list.extend(noise_parser)
-            noise_parser = random.choice(self.noise_group)
-            noise_parser_list.append(noise_parser)
+        # if random.uniform(0.0, 1.0) > 0.5:
+        #     # sample_num = random.randint(1, 2)
+        #     # noise_parser = np.random.choice(self.noise_group, size=sample_num, replace=False)
+        #     # noise_parser_list.extend(noise_parser)
+        #     noise_parser = random.choice(self.noise_group)
+        #     noise_parser_list.append(noise_parser)
+        noise_parser = random.choice(self.noise_group)
+        noise_parser_list.append(noise_parser)
 
         # ### debug
         # for i in perImg_parser_list:
@@ -361,6 +363,8 @@ class Dataset_PairedImage(Dataset):
 
         gt_image = gt_image.astype(np.float32)
         noise_image = noise_image.astype(np.float32)
+
+        noise_image += np.random.random(noise_image.shape) * 5.0
 
         ### todo 需不需要归一化??
         gt_image = self.normalize(gt_image)
