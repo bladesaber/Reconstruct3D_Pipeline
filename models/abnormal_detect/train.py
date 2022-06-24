@@ -42,7 +42,10 @@ def get_args() -> Namespace:
     parser.add_argument("--model", type=str, help="Name of the algorithm to train/test",
                         default="patchcore")
     parser.add_argument("--config", type=str, help="Path to a model config file",
-                        default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/config.yaml')
+                        # default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/patchcore.yaml'
+                        # default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/padim.yaml'
+                        default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/fastflow.yaml'
+                        )
     parser.add_argument("--log-level", type=str, default="INFO", help="<DEBUG, INFO, WARNING, ERROR>")
 
     args = parser.parse_args()

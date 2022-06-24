@@ -31,6 +31,10 @@ class DualImage_Dataset(object):
         parser = iaa.Affine(scale=scale)
         return parser
 
+    def init_blur_parser(self, sigma):
+        parser = iaa.GaussianBlur(sigma=sigma)
+        return parser
+
     def add_noise(self, image, mean=0.0, std=1.0):
         noise = np.random.random(image.shape) * std + mean
         image = (image + noise).astype(image.dtype)
@@ -147,6 +151,13 @@ class DualImage_Dataset(object):
                 parser_list.append(parser)
                 record_dict[name_jpg]['scale'] = {'scale': scale}
 
+            if 'blur' in aug_dict.keys():
+                sigma = random.choice(aug_dict['blur']['sigma'])
+                parser = self.init_blur_parser(sigma=sigma)
+
+                parser_list.append(parser)
+                record_dict[name_jpg]['blur'] = {'sigma': sigma}
+
             if len(parser_list)>0:
                 parser = iaa.Sequential(parser_list, random_order=True)
 
@@ -190,12 +201,12 @@ def main():
 
     dataset_creator = DualImage_Dataset()
     dataset_creator.create_dual_image(
-        images=images, train_num=50, validate_num=100,
-        # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/shuttle_color',
+        images=images, train_num=100, validate_num=100,
+        # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/blur',
         # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/sharp_contrast',
         # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/translate',
         # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/rotate',
-        save_dir='/home/quan/Desktop/tempary/abnormal_dataset/complex',
+        save_dir='/home/quan/Desktop/tempary/abnormal_dataset/complex2',
         aug_dict={
             'sharpen': {
                 'alpha': [0.3, 0.5, 0.7, 0.9],
@@ -207,7 +218,8 @@ def main():
             #     'x_px': [-20, -10, -5, 5, 10, 20],
             #     'y_px': [-20, -10, -5, 5, 10, 20],
             # },
-            'rotate': {'angle': [-10, -5, -3, 3, 5, 10]}
+            # 'rotate': {'angle': [-10, -5, -3, 3, 5, 10]}
+            'blur': {'sigma': [1.0, 3.0, 5.0]}
         }
     )
 

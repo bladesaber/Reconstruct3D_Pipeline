@@ -1,11 +1,4 @@
-import visdom
-import os
-import cv2
-import time
-import random
-import numpy as np
 import albumentations as albu
-import torchvision
 from albumentations.pytorch.transforms import ToTensorV2
 
 transform = albu.Compose([
@@ -33,10 +26,3 @@ albu.save(
     filepath='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/fast_transformer.yaml',
     data_format='yaml'
 )
-
-# image = cv2.imread('/home/quan/Desktop/tempary/abnormal_dataset/complex2/good/0_20220624_104626.jpg')
-# transformed = transform(image=image)
-# transformed_image = transformed["image"]
-# print(transformed_image.shape)
-# cv2.imshow('d', transformed_image)
-# cv2.waitKey(0)
