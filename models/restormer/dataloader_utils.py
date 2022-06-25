@@ -65,6 +65,7 @@ class Weight_DataLoader:
 
 if __name__ == '__main__':
     import yaml
+    import matplotlib.pyplot as plt
     from models.restormer.dataset_utils import Dataset_PairedImage
 
     config_path = '/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/restormer/test_config.yaml'
@@ -79,7 +80,17 @@ if __name__ == '__main__':
 
     for i, data_batch in enumerate(dataLoader.dataloader):
         noise_images, gt_images, names = data_batch
-        print(noise_images.shape, gt_images.shape)
-        print(names)
+        # print(noise_images.shape, gt_images.shape)
+        # print(names)
         # print(data_batch)
-        break
+
+        noise_img = noise_images.numpy()[0, ...]
+        gt_img = gt_images.numpy()[0, ...]
+        noise_img = np.transpose(noise_img, (1, 2, 0))
+        gt_img = np.transpose(gt_img, (1, 2, 0))
+
+        plt.figure('noise')
+        plt.imshow(noise_img)
+        plt.figure('gt')
+        plt.imshow(gt_img)
+        plt.show()

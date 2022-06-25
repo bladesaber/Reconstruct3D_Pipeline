@@ -397,6 +397,10 @@ class Dataset_PairedImage(Dataset):
 
         return ((img - img_min)/(img_max-img_min) * 255.).astype(np.uint8)
 
+class RainDataset(Dataset):
+    def __init__(self, img_dir):
+        super(RainDataset, self).__init__()
+
 if __name__ == '__main__':
     config_path = '/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/restormer/test_config.yaml'
     with open(config_path, 'r') as f:
