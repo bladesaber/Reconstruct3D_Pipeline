@@ -170,12 +170,14 @@ class DualImage_Dataset(object):
 
             image = self.add_noise(image, mean=0.0, std=1.0)
 
-            if random.uniform(0.0, 1.0)>0.5:
-                abnormal_image, mask = self.add_abnormal_tag(image, method='pure')
-                record_dict[name_jpg]['tag_method'] = 'pure'
-            else:
-                abnormal_image, mask = self.add_abnormal_tag(image, method='random')
-                record_dict[name_jpg]['tag_method'] = 'random'
+            # if random.uniform(0.0, 1.0)>0.5:
+            #     abnormal_image, mask = self.add_abnormal_tag(image, method='pure')
+            #     record_dict[name_jpg]['tag_method'] = 'pure'
+            # else:
+            #     abnormal_image, mask = self.add_abnormal_tag(image, method='random')
+            #     record_dict[name_jpg]['tag_method'] = 'random'
+            abnormal_image, mask = self.add_abnormal_tag(image, method='random')
+            record_dict[name_jpg]['tag_method'] = 'random'
 
             if name_id<train_num:
                 cv2.imwrite(os.path.join(good_dir, name_jpg), original_image)
@@ -190,7 +192,7 @@ class DualImage_Dataset(object):
             f.write(json_str)
 
 def main():
-    jpg_dir = '/home/quan/Desktop/tempary/abnormal_dataset/JPEG_Good'
+    jpg_dir = '/home/quan/Desktop/tempary/test_dataset/pos_data'
     jpg_paths = os.listdir(jpg_dir)
     images = []
     for path in tqdm(jpg_paths):
@@ -201,19 +203,19 @@ def main():
 
     dataset_creator = DualImage_Dataset()
     dataset_creator.create_dual_image(
-        images=images, train_num=100, validate_num=100,
+        images=images, train_num=0, validate_num=50,
         # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/blur',
-        # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/sharp_contrast',
+        save_dir='/home/quan/Desktop/tempary/test_dataset/neg',
         # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/translate',
         # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/rotate',
-        save_dir='/home/quan/Desktop/tempary/abnormal_dataset/complex2',
+        # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/complex2',
         aug_dict={
             'sharpen': {
                 'alpha': [0.3, 0.5, 0.7, 0.9],
                 'lightness': [0.75, 1.0, 1.25, 1.5]
             },
             'contrast':{'gamma':[0.5, 1.5]},
-            'shuttle_color': True,
+            # 'shuttle_color': True,
             # 'translate':{
             #     'x_px': [-20, -10, -5, 5, 10, 20],
             #     'y_px': [-20, -10, -5, 5, 10, 20],

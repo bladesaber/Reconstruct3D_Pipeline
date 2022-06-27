@@ -22,13 +22,17 @@ results.
 import logging
 import warnings
 from argparse import ArgumentParser, Namespace
-from pytorch_lightning import Trainer, seed_everything
+import json
+import os
+import numpy as np
 
+from pytorch_lightning import Trainer, seed_everything
 from anomalib.config import get_configurable_parameters
 from anomalib.data import get_datamodule
 from anomalib.models import get_model
 from anomalib.utils.callbacks import LoadModelCallback, get_callbacks
 from anomalib.utils.loggers import configure_logger, get_experiment_logger
+# from anomalib.deploy.optimize import get_model_metadata
 
 logger = logging.getLogger("anomalib")
 
@@ -42,15 +46,31 @@ def get_args() -> Namespace:
     parser.add_argument("--model", type=str, help="Name of the algorithm to train/test",
                         default="patchcore")
     parser.add_argument("--config", type=str, help="Path to a model config file",
-                        # default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/patchcore.yaml'
-                        default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/padim.yaml'
-                        # default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/fastflow.yaml'
+                        default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/cfg/patchcore.yaml'
                         )
     parser.add_argument("--log-level", type=str, default="INFO", help="<DEBUG, INFO, WARNING, ERROR>")
 
     args = parser.parse_args()
     return args
 
+def get_model_metadata(model):
+    meta_data = {}
+    cached_meta_data = {
+        "image_threshold": model.image_threshold.cpu().value.numpy(),
+        "pixel_threshold": model.pixel_threshold.cpu().value.numpy(),
+        "pixel_mean": model.training_distribution.pixel_mean.cpu().numpy(),
+        "image_mean": model.training_distribution.image_mean.cpu().numpy(),
+        "pixel_std": model.training_distribution.pixel_std.cpu().numpy(),
+        "image_std": model.training_distribution.image_std.cpu().numpy(),
+        "min": model.min_max.min.cpu().numpy(),
+        "max": model.min_max.max.cpu().numpy(),
+    }
+    # Remove undefined values by copying in a new dict
+    for key, val in cached_meta_data.items():
+        if not np.isinf(val).all():
+            meta_data[key] = float(val)
+    del cached_meta_data
+    return meta_data
 
 def train():
     """Train an anomaly classification or segmentation model based on a provided configuration file."""
@@ -79,6 +99,12 @@ def train():
 
     logger.info("Testing the model.")
     trainer.test(model=model, datamodule=datamodule)
+
+    meta_data = get_model_metadata(model)
+    print(meta_data)
+    meta_data_path = os.path.join(config.project.path, 'meta_data.json')
+    with open(meta_data_path, 'w') as f:
+        json.dump(meta_data, f)
 
 
 if __name__ == "__main__":

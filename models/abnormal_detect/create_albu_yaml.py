@@ -23,6 +23,6 @@ transform = albu.Compose([
 ])
 albu.save(
     transform,
-    filepath='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/fast_transformer.yaml',
+    filepath='/models/abnormal_detect/cfg/fast_transformer.yaml',
     data_format='yaml'
 )
