@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--model_weight', type=str,
                         default='/home/quan/Desktop/tempary/test_dataset/output/patchcore/folder/weights/model.ckpt')
     parser.add_argument('--meta_data', type=str,
-                        default=None)
+                        default='/home/quan/Desktop/tempary/test_dataset/output/patchcore/folder/meta_data.json')
     parser.add_argument('--model_cfg', type=str,
                         default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/cfg/patchcore.yaml')
 
@@ -72,14 +72,17 @@ def load_infer_model(args):
     return inferencer
 
 def infer(infer_model: Inferencer, img):
-    # img = cv2.resize(img, (416, 416))
+    img = cv2.resize(img, (640, 480))
 
-    output = infer_model.predict(image=img, superimpose=True, overlay_mask=True)
+    output = infer_model.predict(image=img, superimpose=False, overlay_mask=False)
     anomaly_map, score = output
-    cv2.imshow('d', anomaly_map)
-    cv2.waitKey(0)
 
-    raise ValueError
+    # print(score)
+    # print(anomaly_map.min(), anomaly_map.max())
+    defect_mask = np.zeros(anomaly_map.shape, dtype=np.uint8)
+    defect_mask[anomaly_map>=0.5] = 255
+
+    return defect_mask, score
 
 def main():
     background = 0
@@ -96,6 +99,7 @@ def main():
     rgb_cap = cv2.VideoCapture(args.rgb_avi)
     mask_cap = cv2.VideoCapture(args.mask_avi)
 
+    auto_mode = 0
     save_id = 0
     while True:
         _, rgb_img = rgb_cap.read()
@@ -105,7 +109,7 @@ def main():
         pose_rgb, mask = post_process(pose_rgb, label_img=mask_img[:, :, 0])
 
         if infer_model is not None:
-            infer(infer_model, pose_rgb)
+            defect_mask, score = infer(infer_model, pose_rgb)
 
         rgb_img = cv2.resize(rgb_img, (640, 480))
         mask_img = cv2.resize(mask_img, (640, 480))
@@ -116,13 +120,20 @@ def main():
         show_img[:480, 640:, :] = mask_img
         show_img[480:, :640, :] = pose_rgb
 
+        if infer_model is not None:
+            show_img[480:, 640:, :] = np.tile(defect_mask[..., np.newaxis], (1, 1, 3))
+
         cv2.imshow('rgb', show_img)
-        key = cv2.waitKey(0)
+        key = cv2.waitKey(auto_mode)
         if key==ord('q'):
             break
-        if key == ord('s'):
+        elif key == ord('s'):
             cv2.imwrite(os.path.join(args.save_dir, '%d.jpg' % save_id), pose_rgb)
             save_id += 1
+        elif key==ord('p'):
+            auto_mode = 1
+        elif key==ord('o'):
+            auto_mode = 0
         else:
             pass
 
