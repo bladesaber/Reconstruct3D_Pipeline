@@ -25,6 +25,7 @@ def parse_args():
                         default='/home/quan/Desktop/tempary/test_dataset/output/patchcore/folder/meta_data.json')
     parser.add_argument('--model_cfg', type=str,
                         default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/cfg/patchcore.yaml')
+    parser.add_argument()
 
     args = parser.parse_args()
     return args
@@ -94,7 +95,6 @@ def main():
     infer_model = None
     if args.use_infer_model>0:
         infer_model = load_infer_model(args)
-    print(infer_model)
 
     rgb_cap = cv2.VideoCapture(args.rgb_avi)
     mask_cap = cv2.VideoCapture(args.mask_avi)
@@ -110,18 +110,28 @@ def main():
 
         if infer_model is not None:
             defect_mask, score = infer(infer_model, pose_rgb)
+            # print('[DEBUG]###: Score: %f'%score)
 
         rgb_img = cv2.resize(rgb_img, (640, 480))
         mask_img = cv2.resize(mask_img, (640, 480))
         pose_rgb = cv2.resize(pose_rgb, (640, 480))
 
+        ### debug draw picture
         show_img = np.zeros((960, 1280, 3), dtype=np.uint8)
         show_img[:480, :640, :] = rgb_img
         show_img[:480, 640:, :] = mask_img
-        show_img[480:, :640, :] = pose_rgb
 
         if infer_model is not None:
             show_img[480:, 640:, :] = np.tile(defect_mask[..., np.newaxis], (1, 1, 3))
+
+            contours, hierarchy = cv2.findContours(defect_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            for c_id in range(len(contours)):
+                cv2.drawContours(pose_rgb, contours, c_id, (0, 0, 255), 2)
+            cv2.putText(show_img, 'Score:%f'%score, org=(5, 20),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.8,
+                        color=(0, 0, 255), thickness=2)
+
+        show_img[480:, :640, :] = pose_rgb
 
         cv2.imshow('rgb', show_img)
         key = cv2.waitKey(auto_mode)
