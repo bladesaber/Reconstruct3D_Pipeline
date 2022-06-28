@@ -12,20 +12,22 @@ from anomalib.deploy.inferencers.openvino import OpenVINOInferencer
 def parse_args():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--rgb_avi', type=str,
-                        default="/home/quan/Desktop/tempary/test_dataset/test.mp4")
+                        default="/home/quan/Desktop/company/dirty_dataset/test.mp4")
     parser.add_argument('--mask_avi', type=str,
-                        default="/home/quan/Desktop/tempary/test_dataset/mask.avi")
+                        default="/home/quan/Desktop/company/dirty_dataset/mask.avi")
     parser.add_argument('--save_dir', type=str,
-                        default='/home/quan/Desktop/tempary/test_dataset/defect_data/good')
+                        default='/home/quan/Desktop/company/dirty_dataset/defect_data/good')
 
     parser.add_argument('--use_infer_model', type=int, default=1)
     parser.add_argument('--model_weight', type=str,
-                        default='/home/quan/Desktop/tempary/test_dataset/output/patchcore/folder/weights/model.ckpt')
+                        default='/home/quan/Desktop/company/dirty_dataset/output/patchcore/folder/weights/model.ckpt')
     parser.add_argument('--meta_data', type=str,
-                        default='/home/quan/Desktop/tempary/test_dataset/output/patchcore/folder/meta_data.json')
+                        default='/home/quan/Desktop/company/dirty_dataset/output/patchcore/folder/meta_data.json')
     parser.add_argument('--model_cfg', type=str,
                         default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/cfg/patchcore.yaml')
-    parser.add_argument()
+    parser.add_argument('--record_avi', type=int, default=-1)
+    parser.add_argument('--record_avi_path', type=str,
+                        default='/home/quan/Desktop/company/dirty_dataset/result.avi')
 
     args = parser.parse_args()
     return args
@@ -99,6 +101,12 @@ def main():
     rgb_cap = cv2.VideoCapture(args.rgb_avi)
     mask_cap = cv2.VideoCapture(args.mask_avi)
 
+    if args.record_avi:
+        writer_avi = cv2.VideoWriter(
+            args.record_avi_path,
+            cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30, (640, 480)
+        )
+
     auto_mode = 0
     save_id = 0
     while True:
@@ -132,6 +140,9 @@ def main():
                         color=(0, 0, 255), thickness=2)
 
         show_img[480:, :640, :] = pose_rgb
+
+        if args.record_avi:
+            writer_avi.write(show_img)
 
         cv2.imshow('rgb', show_img)
         key = cv2.waitKey(auto_mode)
