@@ -12,15 +12,16 @@ from anomalib.deploy.inferencers.openvino import OpenVINOInferencer
 def parse_args():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--rgb_avi', type=str,
-                        default="/home/quan/Desktop/company/dirty_dataset/test.mp4")
+                        default="/home/quan/Desktop/company/dirty_dataset/rgb_video/2_rgb.avi")
     parser.add_argument('--mask_avi', type=str,
-                        default="/home/quan/Desktop/company/dirty_dataset/mask.avi")
+                        default="/home/quan/Desktop/company/dirty_dataset/rgb_video/2_mask.avi")
     parser.add_argument('--save_dir', type=str,
-                        default='/home/quan/Desktop/company/dirty_dataset/defect_data/good')
+                        default='/home/quan/Desktop/company/dirty_dataset/defect_data/record'
+                        )
 
     parser.add_argument('--use_infer_model', type=int, default=1)
     parser.add_argument('--model_weight', type=str,
-                        default='/home/quan/Desktop/company/dirty_dataset/output/patchcore/folder/weights/model.ckpt')
+                        default='/home/quan/Desktop/company/dirty_dataset/output/fastflow/folder/weights/model.ckpt')
     parser.add_argument('--meta_data', type=str,
                         default='/home/quan/Desktop/company/dirty_dataset/output/patchcore/folder/meta_data.json')
     parser.add_argument('--model_cfg', type=str,
@@ -32,6 +33,7 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+### --------------------------------------------------------------------------
 def post_process(rgb_img, label_img):
     mask = np.zeros(label_img.shape, dtype=np.uint8)
     mask[label_img < 100] = 0
@@ -52,6 +54,7 @@ def post_process(rgb_img, label_img):
 
     mask = np.zeros(label_img.shape, dtype=np.uint8)
     mask[labels==select_label] = 255
+
     rgb_img[mask!=255, :] = 0
 
     return rgb_img, mask
@@ -101,62 +104,71 @@ def main():
     rgb_cap = cv2.VideoCapture(args.rgb_avi)
     mask_cap = cv2.VideoCapture(args.mask_avi)
 
-    if args.record_avi:
+    if args.record_avi>0:
         writer_avi = cv2.VideoWriter(
             args.record_avi_path,
             cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30, (640, 480)
         )
 
     auto_mode = 0
-    save_id = 0
+    save_id = 36
     while True:
         _, rgb_img = rgb_cap.read()
         _, mask_img = mask_cap.read()
 
-        pose_rgb = rgb_img.copy()
-        pose_rgb, mask = post_process(pose_rgb, label_img=mask_img[:, :, 0])
+        if (rgb_img is not None) and (mask_img is not None):
+            pose_rgb = rgb_img.copy()
+            pose_rgb, mask = post_process(pose_rgb, label_img=mask_img[:, :, 0])
 
-        if infer_model is not None:
-            defect_mask, score = infer(infer_model, pose_rgb)
-            # print('[DEBUG]###: Score: %f'%score)
+            if infer_model is not None:
+                defect_mask, score = infer(infer_model, pose_rgb)
+                # print('[DEBUG]###: Score: %f'%score)
 
-        rgb_img = cv2.resize(rgb_img, (640, 480))
-        mask_img = cv2.resize(mask_img, (640, 480))
-        pose_rgb = cv2.resize(pose_rgb, (640, 480))
+            rgb_img = cv2.resize(rgb_img, (640, 480))
+            mask_img = cv2.resize(mask_img, (640, 480))
+            pose_rgb = cv2.resize(pose_rgb, (640, 480))
 
-        ### debug draw picture
-        show_img = np.zeros((960, 1280, 3), dtype=np.uint8)
-        show_img[:480, :640, :] = rgb_img
-        show_img[:480, 640:, :] = mask_img
+            ### debug draw picture
+            show_img = np.zeros((960, 1280, 3), dtype=np.uint8)
+            show_img[:480, :640, :] = rgb_img
+            show_img[:480, 640:, :] = mask_img
 
-        if infer_model is not None:
-            show_img[480:, 640:, :] = np.tile(defect_mask[..., np.newaxis], (1, 1, 3))
+            if infer_model is not None:
+                show_img[480:, 640:, :] = np.tile(defect_mask[..., np.newaxis], (1, 1, 3))
 
-            contours, hierarchy = cv2.findContours(defect_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            for c_id in range(len(contours)):
-                cv2.drawContours(pose_rgb, contours, c_id, (0, 0, 255), 2)
-            cv2.putText(show_img, 'Score:%f'%score, org=(5, 20),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.8,
-                        color=(0, 0, 255), thickness=2)
+                contours, hierarchy = cv2.findContours(defect_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                for c_id in range(len(contours)):
+                    cv2.drawContours(pose_rgb, contours, c_id, (0, 0, 255), 2)
+                cv2.putText(show_img, 'Score:%f'%score, org=(5, 20),
+                            fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.8,
+                            color=(0, 0, 255), thickness=2)
 
-        show_img[480:, :640, :] = pose_rgb
+                # ### just for debug
+                # if len(contours)>0:
+                #     cv2.imwrite(os.path.join(args.save_dir, '%d.jpg' % save_id), pose_rgb)
+                #     save_id += 1
 
-        if args.record_avi:
-            writer_avi.write(show_img)
+            show_img[480:, :640, :] = pose_rgb
 
-        cv2.imshow('rgb', show_img)
-        key = cv2.waitKey(auto_mode)
-        if key==ord('q'):
-            break
-        elif key == ord('s'):
-            cv2.imwrite(os.path.join(args.save_dir, '%d.jpg' % save_id), pose_rgb)
-            save_id += 1
-        elif key==ord('p'):
-            auto_mode = 1
-        elif key==ord('o'):
-            auto_mode = 0
-        else:
-            pass
+            if args.record_avi>0:
+                writer_avi.write(show_img)
+
+            cv2.imshow('rgb', show_img)
+            key = cv2.waitKey(auto_mode)
+            if key==ord('q'):
+                break
+            elif key == ord('s'):
+                cv2.imwrite(os.path.join(args.save_dir, '%d.jpg' % save_id), pose_rgb)
+                save_id += 1
+            elif key==ord('p'):
+                auto_mode = 1
+            elif key==ord('o'):
+                auto_mode = 0
+            else:
+                pass
+
+    if args.record_avi > 0:
+        writer_avi.release()
 
 if __name__ == '__main__':
     main()

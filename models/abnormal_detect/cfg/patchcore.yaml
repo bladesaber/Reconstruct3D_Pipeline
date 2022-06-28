@@ -1,17 +1,21 @@
 dataset:
   name: folder #options: [mvtec, btech, folder]
   format: folder
-  path: /home/quan/Desktop/tempary/test_dataset/defect_data
+  path: /home/quan/Desktop/company/dirty_dataset/defect_data
   normal_dir: good
   abnormal_dir: bad
-  mask: /home/quan/Desktop/tempary/test_dataset/defect_data/mask
+  mask: /home/quan/Desktop/company/dirty_dataset/defect_data/mask
   normal_test_dir: null
   extensions: .jpg
   split_ratio: 0.1
   task: segmentation
+
+#  image_size: 224
   image_size: 416
+#  image_size:
 #    - 480
 #    - 640
+
   train_batch_size: 8
   test_batch_size: 1
   num_workers: 8
@@ -34,7 +38,10 @@ model:
   layers:
     - layer2
     - layer3
-  coreset_sampling_ratio: 0.1
+
+#  coreset_sampling_ratio: 0.1
+  coreset_sampling_ratio: 0.03
+
   num_neighbors: 9
   weight_file: weights/model.ckpt
   normalization_method: min_max # options: [null, min_max, cdf]
@@ -53,7 +60,7 @@ metrics:
 
 project:
   seed: 0
-  path: /home/quan/Desktop/tempary/test_dataset/output
+  path: /home/quan/Desktop/company/dirty_dataset/output
 
 logging:
   log_images_to: ["local"] # options: [wandb, tensorboard, local]. Make sure you also set logger with using wandb or tensorboard.

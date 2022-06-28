@@ -2,15 +2,15 @@ import albumentations as albu
 from albumentations.pytorch.transforms import ToTensorV2
 
 transform = albu.Compose([
-    albu.OneOf([
-        # albu.RGBShift(p=0.5),
-        albu.ChannelShuffle(p=0.5)
-    ], p=0.5),
+    # albu.OneOf([
+    #     # albu.RGBShift(p=0.5),
+    #     albu.ChannelShuffle(p=0.5)
+    # ], p=0.5),
     albu.OneOf([
         albu.RandomBrightness(p=0.5),
         albu.RandomContrast(p=0.5),
-        albu.Sharpen(p=0.5, alpha=(0.3, 0.9), lightness=(0.75, 1.5)),
-        albu.GaussianBlur(blur_limit=(1, 3), p=0.5)
+        # albu.Sharpen(p=0.5, alpha=(0.3, 0.9), lightness=(0.75, 1.5)),
+        # albu.GaussianBlur(blur_limit=(1, 3), p=0.5)
     ], p=0.5),
     albu.Affine(translate_px={"x": (-10, 10), "y": (-10, 10)}, rotate=(1, 5), p=0.5),
     # albu.OneOf([
@@ -23,6 +23,6 @@ transform = albu.Compose([
 ])
 albu.save(
     transform,
-    filepath='/models/abnormal_detect/cfg/fast_transformer.yaml',
+    filepath='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/cfg/fast_transformer.yaml',
     data_format='yaml'
 )

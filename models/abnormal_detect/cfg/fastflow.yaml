@@ -1,20 +1,26 @@
 dataset:
   name: folder #options: [mvtec, btech, folder]
   format: folder
-  path: /home/quan/Desktop/tempary/abnormal_dataset/complex2
+  path: /home/quan/Desktop/company/dirty_dataset/defect_data
   normal_dir: good
   abnormal_dir: bad
-  mask: /home/quan/Desktop/tempary/abnormal_dataset/complex2/mask
+  mask: /home/quan/Desktop/company/dirty_dataset/defect_data/mask
   normal_test_dir: null
   extensions: .jpg
-  split_ratio: 0.2
+  split_ratio: 0.1
   task: segmentation
-  image_size: 224 # options: [256, 256, 448, 384] - for each supported backbone
-  train_batch_size: 4
-  test_batch_size: 4
+
+#  image_size: 224 # options: [256, 256, 448, 384] - for each supported backbone
+  image_size: 416
+#  image_size:
+#    - 480
+#    - 640
+
+  train_batch_size: 2
+  test_batch_size: 2
   num_workers: 8
   transform_config:
-    train: /home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/fast_transformer.yaml
+    train: /home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/cfg/fast_transformer.yaml
     val: null
   create_validation_set: false
   tiling:
@@ -27,8 +33,9 @@ dataset:
 
 model:
   name: fastflow
-  backbone: resnet18 # options: [resnet18, wide_resnet50_2, cait_m48_448, deit_base_distilled_patch16_384]
-#  backbone: wide_resnet50_2
+#  backbone: resnet18 # options: [resnet18, wide_resnet50_2, cait_m48_448, deit_base_distilled_patch16_384]
+  backbone: wide_resnet50_2
+
   flow_steps: 8 # options: [8, 8, 20, 20] - for each supported backbone
   hidden_ratio: 1.0 # options: [1.0, 1.0, 0.16, 0.16] - for each supported backbone
   conv3x3_only: True # options: [True, False, False, False] - for each supported backbone
@@ -54,7 +61,7 @@ metrics:
 
 project:
   seed: 42
-  path: /home/quan/Desktop/tempary/abnormal_dataset/output
+  path: /home/quan/Desktop/company/dirty_dataset/output
 
 logging:
   log_images_to: ["local"] # options: [wandb, tensorboard, local]. Make sure you also set logger with using wandb or tensorboard.
