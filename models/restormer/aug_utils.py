@@ -333,17 +333,12 @@ def test_polygon_mask():
 if __name__ == '__main__':
     # test_polygon_mask()
 
-    image = cv2.imread('/home/quan/Desktop/company/car_data/1_1.jpg')
+    image = cv2.imread('/home/quan/Desktop/company/dataset/c2dca001870105f8b82f14441aa96ce0.jpeg')
+    texture_img = cv2.imread('/home/quan/Desktop/company/dataset/texture/11.jpg')
+    texture_img = cv2.resize(texture_img, (300, 300))
 
-    parser = iaa.ChannelShuffle(p=1.0)
-    parser = iaa.Sequential([parser])
+    show_img = image_seamless_mixed(front_img=texture_img, background_img=image, center_x=1400, center_y=900)
+    show_img = cv2.resize(show_img, (1280, 720))
 
-    if len(image.shape) == 3:
-        image = image[np.newaxis, ...]
-        image = parser(images=image)
-        image = image[0, ...]
-    else:
-        image = parser(images=image)
-
-    cv2.imshow('d', image)
+    cv2.imshow('d', show_img)
     cv2.waitKey(0)
