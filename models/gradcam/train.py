@@ -18,6 +18,12 @@ def parse_args():
                         default='experiment_1')
     parser.add_argument('--save_dir', type=str, help='',
                         default='/home/quan/Desktop/tempary/output')
+
+    parser.add_argument('--img_dir', type=str,
+                        default='/home/quan/Desktop/company/dirty_dataset/defect_data/good')
+    parser.add_argument('--support_dir', type=str,
+                        default='/home/quan/Desktop/company/support_dataset')
+
     parser.add_argument('--device', type=str, default='cpu')
 
     parser.add_argument('--optimizer_type', type=str, help='', default='Adam')
@@ -41,17 +47,18 @@ def main():
 
     device = args.device
 
-    if not os.path.exists(args.save_dir):
-        os.mkdir(args.save_dir)
-    if not os.path.exists(os.path.join(args.save_dir, 'checkpoints')):
-        os.mkdir(os.path.join(args.save_dir, 'checkpoints'))
+    save_dir = os.path.join(args.save_dir, args.experient)
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
+    if not os.path.exists(os.path.join(save_dir, 'checkpoints')):
+        os.mkdir(os.path.join(save_dir, 'checkpoints'))
 
     logger = SummaryWriter(log_dir=args.save_dir)
 
     network = Resnet18_model()
     dataset = CutpasteDataset(
-        img_dir='/home/quan/Desktop/company/dirty_dataset/defect_data/good',
-        support_dir='/home/quan/Desktop/company/support_dataset',
+        img_dir=args.img_dir,
+        support_dir=args.support_dir,
         channel_first=True
     )
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
@@ -67,7 +74,7 @@ def main():
 
     time_tag = (datetime.datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
     saver = Last_Saver(
-        path=os.path.join(args.save_dir, 'checkpoints', "model_last.pth"),
+        path=os.path.join(save_dir, 'checkpoints', "model_last.pth"),
         meta=time_tag
     )
 
