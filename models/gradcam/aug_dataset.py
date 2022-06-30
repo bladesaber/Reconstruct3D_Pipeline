@@ -200,7 +200,7 @@ if __name__ == '__main__':
     for idx, (img, label) in enumerate(dataset):
         print('[DEBUG]: ', label)
 
-        # img = ((img-img.min())/(img.max() - img.min()) * 255.).astype(np.uint8)
+        img = ((img-img.min())/(img.max() - img.min()) * 255.).astype(np.uint8)
 
         plt.imshow(img)
         plt.show()

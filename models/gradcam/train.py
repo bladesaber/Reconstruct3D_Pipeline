@@ -7,7 +7,7 @@ import datetime
 import numpy as np
 
 from tensorboardX import SummaryWriter
-from models.gradcam.model import Resnet18_model
+from models.gradcam.model import Resnet18_model, Resnet50_model
 from models.gradcam.aug_dataset import CutpasteDataset
 from models.utils.utils import Last_Saver
 
@@ -28,12 +28,12 @@ def parse_args():
 
     parser.add_argument('--optimizer_type', type=str, help='', default='Adam')
     parser.add_argument('--lr', type=float, default=0.01)
-    parser.add_argument('--minimum_lr', type=float, default=1e-4)
+    parser.add_argument('--minimum_lr', type=float, default=1e-5)
     parser.add_argument('--regularization', type=float, default=0.0005)
     parser.add_argument('--accumulate', type=int, default=1)
     parser.add_argument('--max_epoches', type=int, default=300)
 
-    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--lr_update_patient', type=int, default=10)
 
     parser.add_argument('--warmup', type=int, default=10)
@@ -53,13 +53,15 @@ def main():
     if not os.path.exists(os.path.join(save_dir, 'checkpoints')):
         os.mkdir(os.path.join(save_dir, 'checkpoints'))
 
-    logger = SummaryWriter(log_dir=args.save_dir)
+    logger = SummaryWriter(log_dir=save_dir)
 
-    network = Resnet18_model()
+    # network = Resnet18_model()
+    network = Resnet50_model()
     dataset = CutpasteDataset(
         img_dir=args.img_dir,
         support_dir=args.support_dir,
-        channel_first=True
+        channel_first=True,
+        with_normalize=True
     )
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
@@ -117,7 +119,7 @@ def main():
         logger.add_scalar('loss', curr_loss, global_step=epoch)
         logger.add_scalar('lr', current_lr, global_step=epoch)
         logger.add_scalar('acc', curr_acc, global_step=epoch)
-        print('###### epoch:%d loss:%f acc:%f'%(epoch, curr_loss, curr_acc))
+        print('###### epoch:%d loss:%f acc:%f \n'%(epoch, curr_loss, curr_acc))
 
         epoch += 1
 
