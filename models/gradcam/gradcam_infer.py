@@ -18,9 +18,9 @@ def parse_args():
     parser.add_argument('--device', type=str, default='cpu')
 
     parser.add_argument('--rgb_avi', type=str,
-                        default="/home/quan/Desktop/company/dirty_dataset/rgb_video/2_rgb.avi")
+                        default="/home/quan/Desktop/company/dirty_dataset/rgb_video/1_rgb.avi")
     parser.add_argument('--mask_avi', type=str,
-                        default="/home/quan/Desktop/company/dirty_dataset/rgb_video/2_mask.avi")
+                        default="/home/quan/Desktop/company/dirty_dataset/rgb_video/1_mask.avi")
 
     args = parser.parse_args()
     return args
@@ -82,7 +82,7 @@ def main():
     mask_cap = cv2.VideoCapture(args.mask_avi)
 
     # net = Resnet18_model(is_train=False)
-    net = Resnet50_model(is_train=False)
+    net = Resnet50_model(is_train=False, with_init=False)
 
     use_cuda = False
     if args.device == 'cuda':
@@ -95,7 +95,8 @@ def main():
 
     target_layers = [net.backbone.layer4]
     cam = GradCAM(model=net, target_layers=target_layers, use_cuda=use_cuda)
-    # net.zero_grad()
+    auto_mode = 0
+
     while True:
         _, rgb_img = rgb_cap.read()
         _, mask_img = mask_cap.read()
@@ -106,6 +107,7 @@ def main():
 
             pose_rgb = rgb_img.copy()
             pose_rgb, mask = post_process(pose_rgb, label_img=mask_img[:, :, 0])
+            temp_rgb = pose_rgb.copy()
 
             pose_rgb = imnormalize_(
                 pose_rgb,
@@ -120,15 +122,31 @@ def main():
 
             out = net(input_tensor)
             out = out.cpu().detach().numpy()
-            print('[DEBUG]: logits: ', out)
+            out = out[0]
+            print('[DEBUG]: logits: good:%.2f bad:%.2f'%(out[0], out[1]))
 
-            target_category = 0
+            target_category = 1
             grayscale_cam = cam(input_tensor=input_tensor, target_category=target_category)
             grayscale_cam = grayscale_cam[0, :]
-            print(grayscale_cam.shape)
-            # visualization = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
 
-        break
+            heatmap = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
+            # heatmap = np.tile(grayscale_cam[..., np.newaxis], (1, 1, 3))
+            # heatmap = (heatmap *255.).astype(np.uint8)
+
+            show_img = np.zeros((480, 1280, 3), dtype=np.uint8)
+            show_img[:480, :640, :] = temp_rgb
+            show_img[:480, 640:, :] = heatmap
+
+            cv2.imshow('rgb', show_img)
+            key = cv2.waitKey(auto_mode)
+            if key == ord('q'):
+                break
+            elif key == ord('p'):
+                auto_mode = 1
+            elif key == ord('o'):
+                auto_mode = 0
+            else:
+                pass
 
 if __name__ == '__main__':
     main()

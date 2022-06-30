@@ -15,7 +15,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
 
     parser.add_argument('--experient', type=str, help='',
-                        default='experiment_1')
+                        default='experiment_2')
     parser.add_argument('--save_dir', type=str, help='',
                         default='/home/quan/Desktop/tempary/output')
 
@@ -28,7 +28,7 @@ def parse_args():
 
     parser.add_argument('--optimizer_type', type=str, help='', default='Adam')
     parser.add_argument('--lr', type=float, default=0.01)
-    parser.add_argument('--minimum_lr', type=float, default=1e-5)
+    parser.add_argument('--minimum_lr', type=float, default=1e-4)
     parser.add_argument('--regularization', type=float, default=0.0005)
     parser.add_argument('--accumulate', type=int, default=1)
     parser.add_argument('--max_epoches', type=int, default=300)
@@ -55,13 +55,13 @@ def main():
 
     logger = SummaryWriter(log_dir=save_dir)
 
-    # network = Resnet18_model()
-    network = Resnet50_model()
+    network = Resnet18_model()
+    # network = Resnet50_model()
     dataset = CutpasteDataset(
         img_dir=args.img_dir,
         support_dir=args.support_dir,
         channel_first=True,
-        with_normalize=True
+        with_normalize=False
     )
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 

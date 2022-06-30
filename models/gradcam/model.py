@@ -34,7 +34,7 @@ class Resnet50_test(nn.Module):
         return self._features
 
 class Resnet18_model(nn.Module):
-    def __init__(self, is_train=True):
+    def __init__(self, is_train=True, with_init=True):
         super().__init__()
         self.backbone = models.resnet18(pretrained=True)
         self.backbone.fc = nn.Linear(512, 32, bias=True)
@@ -44,7 +44,8 @@ class Resnet18_model(nn.Module):
         if is_train:
             self.loss_fn = nn.CrossEntropyLoss()
 
-        self.init_weight()
+        if with_init:
+            self.init_weight()
 
     def forward(self, x):
         x = self.backbone(x)
@@ -79,7 +80,7 @@ class Resnet18_model(nn.Module):
         torch.nn.init.normal_(self.out_linear.weight)
 
 class Resnet50_model(nn.Module):
-    def __init__(self, is_train=True):
+    def __init__(self, is_train=True, with_init=True):
         super().__init__()
         self.backbone = models.resnet50(pretrained=True)
         self.backbone.fc = nn.Linear(2048, 64, bias=True)
@@ -88,7 +89,8 @@ class Resnet50_model(nn.Module):
         if is_train:
             self.loss_fn = nn.CrossEntropyLoss()
 
-        self.init_weight()
+        if with_init:
+            self.init_weight()
 
     def forward(self, x):
         x = self.backbone(x)

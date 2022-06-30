@@ -1,15 +1,15 @@
 import argparse
 import os
 import torch
-import datetime
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
 
 from models.gradcam.aug_dataset import CutpasteDataset
 from models.gradcam.model import Resnet18_model, Resnet50_model
 
-# from models.gradcam.gradcam_utils import GradCAM
-from pytorch_grad_cam import GradCAM
+from models.gradcam.gradcam_utils import GradCAM
+# from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 def parse_args():
@@ -27,6 +27,19 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def show_cam_on_image(img: np.ndarray,
+                      mask: np.ndarray,
+                      use_rgb: bool = False,
+                      colormap: int = cv2.COLORMAP_JET) -> np.ndarray:
+    heatmap = cv2.applyColorMap(np.uint8(255 * mask), colormap)
+    if use_rgb:
+        heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
+    heatmap = np.float32(heatmap) / 255
+
+    cam = heatmap + img
+    cam = cam / np.max(cam)
+    return np.uint8(255 * cam)
+
 def main():
     args = parse_args()
 
@@ -37,7 +50,7 @@ def main():
     )
 
     # net = Resnet18_model(is_train=False)
-    net = Resnet50_model(is_train=False)
+    net = Resnet50_model(is_train=False, with_init=False)
     if args.device == 'cuda':
         net = net.cuda()
     net.eval()
@@ -46,8 +59,8 @@ def main():
     net.load_state_dict(weight)
 
     target_layers = [net.backbone.layer4[-1]]
-    # cam = GradCAM(model=net, target_layers=target_layers, use_cuda=False)
-    cam = GradCAM(model=net, target_layers=target_layers)
+    cam = GradCAM(model=net, target_layers=target_layers, use_cuda=False)
+    # cam = GradCAM(model=net, target_layers=target_layers)
 
     for idx, (img, label) in enumerate(dataset):
 
@@ -69,12 +82,12 @@ def main():
         print('[DEBUG]: logits: ', out)
         print('[DEBUG]: Correct Label: %d pred_label: %d'%(label, pred_label))
 
-        # grayscale_cam = cam(input_tensor=img, target_category=1)
-        grayscale_cam = cam(input_tensor=img, targets=None,)
+        grayscale_cam = cam(input_tensor=img, target_category=1)
+        # grayscale_cam = cam(input_tensor=img, targets=None,)
         grayscale_cam = grayscale_cam[0, :]
-        print(grayscale_cam.shape)
+        heatmap = show_cam_on_image(rgb_img.copy(), grayscale_cam, use_rgb=True)
 
-        plt.imshow(rgb_img)
+        plt.imshow(heatmap)
         plt.show()
 
 if __name__ == '__main__':
