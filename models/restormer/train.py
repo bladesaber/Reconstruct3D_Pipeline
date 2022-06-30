@@ -10,11 +10,11 @@ import numpy as np
 import time
 
 from models.restormer.restormer import Restormer
-from models.restormer.utils import setup_optimizers
+from models.utils.utils import setup_optimizers
 from models.restormer.dataset_utils import Dataset_PairedImage
 from models.restormer.dataloader_utils import Group_DataLoader
-from models.restormer.utils import Last_Saver
-from models.restormer.logger import Logger_Visdom
+from models.utils.utils import Last_Saver
+from models.utils.logger import Logger_Visdom
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')

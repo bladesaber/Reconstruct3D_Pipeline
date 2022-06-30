@@ -4,23 +4,18 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage import morphology
+import random
+import torchvision.models as models
+import torch
+import torch.nn as nn
 
-cap1 = cv2.VideoCapture("/home/quan/Desktop/company/dirty_dataset/rgb_video/1_rgb.avi")
-cap2 = cv2.VideoCapture("/home/quan/Desktop/company/dirty_dataset/rgb_video/2_rgb.avi")
+model = models.resnet18(pretrained=True)
+model.fc = nn.Linear(512, 64)
+print(model)
+# for idx, i in enumerate(model.children()):
+#     print(idx)
+#     print(i)
 
-while True:
-    _, img1 = cap1.read()
-    _, img2 = cap2.read()
-
-    if (img1 is not None) and (img2 is not None):
-        img1 = cv2.resize(img1, (640, 480))
-        img2 = cv2.resize(img2, (640, 480))
-
-        show_img = np.zeros((480, 1280, 3), dtype=np.uint8)
-        show_img[:480, :640, :] = img1
-        show_img[:480, 640:, :] = img2
-
-        cv2.imshow('rgb', show_img)
-        key = cv2.waitKey(0)
-        if key == ord('q'):
-            break
+# a = torch.from_numpy(np.random.random((2, 3, 480, 640)).astype(np.float32))
+# c = model(a)
+# print(c.shape)
