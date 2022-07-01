@@ -1,5 +1,7 @@
 from typing import Union
+import numpy as np
 import torch
+import math
 
 def setup_optimizers(
         network:torch.nn.Module, opt_type,
@@ -30,7 +32,7 @@ def setup_optimizers(
 
     return optimizer
 
-class Last_Saver:
+class Last_Saver(object):
     def __init__(self, path, meta):
         self.path = path
         self.meta = meta
@@ -41,3 +43,19 @@ class Last_Saver:
             'state_dict': model.state_dict()
         }
         torch.save(checkpoint, self.path)
+
+class Best_Saver(object):
+    def __init__(self, path, meta):
+        self.path = path
+        self.meta = meta
+        self.best_score = math.inf
+
+    def save(self, model, score):
+        if score<self.best_score:
+            self.best_score = score
+
+            checkpoint = {
+                'meta': self.meta,
+                'state_dict': model.state_dict()
+            }
+            torch.save(checkpoint, self.path)

@@ -72,7 +72,7 @@ def main():
     )
 
     if device == 'cuda':
-        network = network.to('CUDA:1')
+        network = network.to(torch.device('cuda:0'))
 
     time_tag = (datetime.datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
     saver = Last_Saver(
@@ -94,8 +94,8 @@ def main():
 
             batch_img, batch_labels = data_batch
             if device == 'cuda':
-                batch_img = batch_img.to('CUDA:1')
-                batch_labels = batch_labels.to('CUDA:1')
+                batch_img = batch_img.to(torch.device('cuda:0'))
+                batch_labels = batch_labels.to(torch.device('cuda:0'))
 
             loss, acc = network.train_step(x=batch_img, labels=batch_labels)
 
