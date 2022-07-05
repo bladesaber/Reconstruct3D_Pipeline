@@ -21,14 +21,14 @@ def parse_args():
 
     parser.add_argument('--use_infer_model', type=int, default=1)
     parser.add_argument('--model_weight', type=str,
-                        default='/home/quan/Desktop/company/dirty_dataset/output/fastflow/folder/weights/model.ckpt')
+                        default='/home/quan/Desktop/company/dirty_dataset/output/patchcore/folder/weights/model.ckpt')
     parser.add_argument('--meta_data', type=str,
                         default='/home/quan/Desktop/company/dirty_dataset/output/patchcore/folder/meta_data.json')
     parser.add_argument('--model_cfg', type=str,
                         default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/cfg/patchcore.yaml')
-    parser.add_argument('--record_avi', type=int, default=-1)
+    parser.add_argument('--record_avi', type=int, default=1)
     parser.add_argument('--record_avi_path', type=str,
-                        default='/home/quan/Desktop/company/dirty_dataset/result.avi')
+                        default='/home/quan/Desktop/company/dirty_dataset/result2.avi')
 
     args = parser.parse_args()
     return args
@@ -107,7 +107,7 @@ def main():
     if args.record_avi>0:
         writer_avi = cv2.VideoWriter(
             args.record_avi_path,
-            cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30, (640, 480)
+            cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30, (1280, 960)
         )
 
     auto_mode = 0

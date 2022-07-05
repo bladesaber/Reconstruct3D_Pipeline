@@ -15,7 +15,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
 
     parser.add_argument('--experient', type=str, help='',
-                        default='experiment_2')
+                        default='experiment_3')
     parser.add_argument('--save_dir', type=str, help='',
                         default='/home/quan/Desktop/tempary/output')
 

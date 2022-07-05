@@ -7,8 +7,8 @@ import datetime
 import numpy as np
 
 from tensorboardX import SummaryWriter
-from models.gradcam.model import Resnet18_model, Resnet50_model
-from models.gradcam.aug_dataset import CutpasteDataset
+from models.RIAD.aug_dataset import CustomDataset
+from models.RIAD.model import UNet
 from models.utils.utils import Best_Saver
 
 def parse_args():
@@ -18,6 +18,10 @@ def parse_args():
                         default='experiment_2')
     parser.add_argument('--save_dir', type=str, help='',
                         default='/home/quan/Desktop/tempary/output')
+    parser.add_argument('--mask_dir', type=str, help='',
+                        default='/home/quan/Desktop/company/dirty_dataset/RAID/masks')
+    parser.add_argument('--img_dir', type=str, help='',
+                        default='/home/quan/Desktop/company/dirty_dataset/RAID/images')
 
     parser.add_argument('--device', type=str, default='cpu')
 
@@ -28,7 +32,7 @@ def parse_args():
     parser.add_argument('--accumulate', type=int, default=1)
     parser.add_argument('--max_epoches', type=int, default=300)
 
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--lr_update_patient', type=int, default=10)
 
     parser.add_argument('--warmup', type=int, default=10)
@@ -48,4 +52,89 @@ def main():
 
     logger = SummaryWriter(log_dir=save_dir)
 
+    network = UNet()
+    dataset = CustomDataset(
+        img_dir=args.img_dir,
+        mask_dir=args.mask_dir,
+        channel_first=True,
+        with_aug=False,
+        with_normalize=True
+    )
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
+    optimizer = torch.optim.Adam(network.parameters(), lr=args.lr, weight_decay=args.regularization)
+    scheduler = ReduceLROnPlateau(
+        optimizer, 'min', factor=0.5, patience=args.lr_update_patient,
+        verbose=True, cooldown=0
+    )
+
+    device = args.device
+    if device == 'cuda':
+        network = network.to(torch.device('cuda:0'))
+
+    time_tag = (datetime.datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+    saver = Best_Saver(
+        path=os.path.join(save_dir, 'checkpoints', "model_last.pth"),
+        meta=time_tag
+    )
+
+    epoch = 0
+    step = 0
+    while True:
+        network.train()
+
+        current_lr = optimizer.param_groups[0]['lr']
+
+        batch_losses = []
+        for i, data_batch in enumerate(dataloader):
+            step += 1
+
+            batch_imgs, batch_masks, batch_mask_imgs = data_batch
+            if device == 'cuda':
+                batch_imgs = batch_imgs.to(torch.device('cuda:0'))
+                batch_masks = batch_masks.to(torch.device('cuda:0'))
+                batch_mask_imgs = batch_mask_imgs.to(torch.device('cuda:0'))
+
+            loss_dict = network.train_step(
+                imgs=batch_imgs,
+                disjoint_masks=batch_masks,
+                mask_imgs=batch_mask_imgs
+            )
+
+            total_loss = loss_dict['total']
+            total_loss.backward()
+            if step % args.accumulate == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+
+            loss_mse_float = loss_dict['mse'].cpu().item()
+            loss_ssim_float = loss_dict['ssim'].cpu().item()
+            loss_msgm_float = loss_dict['msgm'].cpu().item()
+            loss_total_float = total_loss.cpu().detach().item()
+
+            s = 'epoch:%d/step:%d lr:%1.7f loss:%5.5f mse:%.3f ssim:%.3f msgm:%.3f' % (
+                epoch, step, current_lr, loss_total_float, loss_mse_float, loss_ssim_float, loss_msgm_float
+            )
+            print(s)
+
+        # logger.add_scalar('loss', curr_loss, global_step=epoch)
+        # logger.add_scalar('lr', current_lr, global_step=epoch)
+        # print('###### epoch:%d loss:%f acc:%f \n' % (epoch, curr_loss, curr_acc))
+        #
+        # epoch += 1
+        #
+        # if (epoch > args.warmup) and (epoch % args.checkpoint_interval == 0):
+        #     scheduler.step(curr_loss)
+        #     saver.save(network)
+        #
+        #     if current_lr < args.minimum_lr:
+        #         break
+        #
+        # if epoch > args.max_epoches:
+        #     break
+
+        break
+
+
+if __name__ == '__main__':
+    main()

@@ -1,6 +1,9 @@
+import numpy as np
 import torch.nn as nn
 import torch
 from models.RIAD.loss_utils import SSIMLoss, MSGMSLoss
+
+import matplotlib.pyplot as plt
 
 def upconv2x2(in_channels, out_channels, mode="transpose"):
     if mode == "transpose":
@@ -29,6 +32,7 @@ class UNetDownBlock(nn.Module):
             out_channels=self.out_channels,
             kernel_size=self.kernel_size,
             stride=self.stride,
+            padding=self.padding
         )
         self.bn1 = nn.BatchNorm2d(self.out_channels, eps=1e-05)
         self.relu1 = nn.ReLU()
@@ -36,7 +40,7 @@ class UNetDownBlock(nn.Module):
         self.conv2 = nn.Conv2d(
             in_channels=self.out_channels,
             out_channels=self.out_channels,
-            kernel_size=3, stride=1, padding=1
+            kernel_size=3, stride=1, padding=self.padding
         )
         self.bn2 = nn.BatchNorm2d(self.out_channels, eps=1e-05)
         self.relu2 = nn.ReLU()
@@ -95,7 +99,9 @@ class UNetUpBlock(nn.Module):
 class UNet(nn.Module):
     def __init__(
             self, is_training=True,
-            n_channels=3, merge_mode="concat", up_mode="transpose",
+            n_channels=3, merge_mode="concat",
+            # up_mode="transpose",
+            up_mode='bilinear',
     ):
         super(UNet, self).__init__()
 
@@ -142,17 +148,37 @@ class UNet(nn.Module):
 
         return x
 
-    def train_step(self, imgs, disjoint_masks):
+    def train_step(self, imgs, disjoint_masks, mask_imgs):
         mb_reconst = 0
-        for mask in disjoint_masks:
-            mb_cutout = imgs * mask
-            mb_inpaint = self.model(mb_cutout)
+        mask_num = disjoint_masks.shape[1]
+
+        for mask_id in range(mask_num):
+            mask_img = mask_imgs[:, mask_id, :, :, :]
+            mask = disjoint_masks[:, mask_id, :, :]
+
+            # temp_mask_img = mask_img.cpu().numpy()
+            # temp_mask = mask.cpu().numpy()
+            # for temp_id in range(temp_mask_img.shape[0]):
+            #     temp_img = temp_mask_img[temp_id, ...]
+            #     temp_mask_single = temp_mask[temp_id, ...]
+            #     temp_img = np.transpose(temp_img, (1, 2, 0))
+            #     plt.figure('1')
+            #     plt.imshow(temp_img)
+            #     plt.figure('2')
+            #     plt.imshow(temp_mask_single)
+            #     plt.show()
+
+            mb_inpaint = self.forward(mask_img)
+            mask = mask.unsqueeze(1)
             mb_reconst += mb_inpaint * (1 - mask)
 
         mse_loss = self.mse_loss_fn(mb_reconst, imgs)
         ssim_loss = self.ssim_loss_fn(mb_reconst, imgs, as_loss=True)
         msgm_loss = self.msgm_loss_fn(mb_reconst, imgs, as_loss=True)
         total_loss = mse_loss + ssim_loss + msgm_loss
+
+        print(total_loss)
+        raise ValueError
 
         return {
             'mse': mse_loss,
