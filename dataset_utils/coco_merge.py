@@ -9,10 +9,11 @@ def parse_args():
 
     parser.add_argument('--input', type=str, nargs='+',
                         default=[
-                            '/home/quan/Desktop/1/1.json',
-                            '/home/quan/Desktop/1/2.json',
+                            '/home/quan/Desktop/company/dirty_dataset/maskformer/annotations/1.json',
+                            '/home/quan/Desktop/company/dirty_dataset/maskformer/annotations/3.json',
                         ])
-    parser.add_argument('--output', default='/home/quan/Desktop/1/3.json', type=str, help='')
+    parser.add_argument('--output',
+                        default='/home/quan/Desktop/company/dirty_dataset/maskformer/annotations/instances_default.json', type=str, help='')
 
     args = parser.parse_args()
     return args

@@ -48,7 +48,7 @@ def get_args() -> Namespace:
                         # default='fastflow'
                         )
     parser.add_argument("--config", type=str, help="Path to a model config file",
-                        default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/cfg/patchcore.yaml'
+                        default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/cfg/patchcore_2.yaml'
                         # default='/home/quan/Desktop/company/Reconstruct3D_Pipeline/models/abnormal_detect/cfg/fastflow.yaml'
                         )
     parser.add_argument("--log-level", type=str, default="INFO", help="<DEBUG, INFO, WARNING, ERROR>")

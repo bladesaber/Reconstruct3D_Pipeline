@@ -192,7 +192,7 @@ class DualImage_Dataset(object):
             f.write(json_str)
 
 def main():
-    jpg_dir = '/home/quan/Desktop/tempary/test_dataset/pos_data'
+    jpg_dir = '/home/quan/Desktop/company/dirty_dataset/test_img/good'
     jpg_paths = os.listdir(jpg_dir)
     images = []
     for path in tqdm(jpg_paths):
@@ -205,16 +205,16 @@ def main():
     dataset_creator.create_dual_image(
         images=images, train_num=0, validate_num=50,
         # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/blur',
-        save_dir='/home/quan/Desktop/tempary/test_dataset/neg',
+        save_dir='/home/quan/Desktop/company/dirty_dataset/test_img',
         # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/translate',
         # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/rotate',
         # save_dir='/home/quan/Desktop/tempary/abnormal_dataset/complex2',
         aug_dict={
-            'sharpen': {
-                'alpha': [0.3, 0.5, 0.7, 0.9],
-                'lightness': [0.75, 1.0, 1.25, 1.5]
-            },
-            'contrast':{'gamma':[0.5, 1.5]},
+            # 'sharpen': {
+            #     'alpha': [0.3, 0.5, 0.7, 0.9],
+            #     'lightness': [0.75, 1.0, 1.25, 1.5]
+            # },
+            # 'contrast':{'gamma':[0.5, 1.5]},
             # 'shuttle_color': True,
             # 'translate':{
             #     'x_px': [-20, -10, -5, 5, 10, 20],
@@ -235,5 +235,3 @@ if __name__ == '__main__':
     #     )
 
     main()
-
-    pass

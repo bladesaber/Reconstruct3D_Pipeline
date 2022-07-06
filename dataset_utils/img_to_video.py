@@ -10,7 +10,9 @@ def parse_args():
     parser.add_argument('--dir', type=str,
                         default="/home/quan/Desktop/company/dirty_dataset/rgb_video/car")
     parser.add_argument('--save_path', type=str,
-                        default="/home/quan/Desktop/company/dirty_dataset/rgb_video/2_temp.avi")
+                        default="/home/quan/Desktop/company/dirty_dataset/rgb_video/3_mask.avi")
+    parser.add_argument('--width', type=int, default=540)
+    parser.add_argument('--height', type=int, default=960)
     args = parser.parse_args()
     return args
 
@@ -24,7 +26,7 @@ def main():
 
     video_writter = cv2.VideoWriter(
             args.save_path,
-            cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30, (1280, 720)
+            cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30, (args.width, args.height)
         )
     for idx in range(len(os.listdir(args.dir))):
         img = cv2.imread(path_dict[idx], cv2.IMREAD_UNCHANGED)

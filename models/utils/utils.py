@@ -50,11 +50,12 @@ class Best_Saver(object):
         self.meta = meta
         self.best_score = math.inf
 
-    def save(self, model, score):
+    def save(self, model, score, epoch):
         if score<self.best_score:
             self.best_score = score
 
             checkpoint = {
+                'epoch': epoch,
                 'meta': self.meta,
                 'state_dict': model.state_dict()
             }

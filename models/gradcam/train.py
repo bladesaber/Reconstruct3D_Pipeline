@@ -133,5 +133,7 @@ def main():
         if epoch > args.max_epoches:
             break
 
+    saver.save(network)
+
 if __name__ == '__main__':
     main()

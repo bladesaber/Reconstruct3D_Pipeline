@@ -10,9 +10,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description='COCO show')
 
     parser.add_argument('--image-dir', type=str,
-                        default='/home/quan/Desktop/1/images')
+                        default='/home/quan/Desktop/company/dirty_dataset/maskformer/images')
     parser.add_argument('--coco-json', type=str,
-                        default='/home/quan/Desktop/1/3.json')
+                        default='/home/quan/Desktop/company/dirty_dataset/maskformer/annotations/instances_default.json')
     parser.add_argument('--show-or-match', default=True)
     parser.add_argument('--type', type=str, help='custom|coco',
                         default='coco')

@@ -177,9 +177,6 @@ class UNet(nn.Module):
         msgm_loss = self.msgm_loss_fn(mb_reconst, imgs, as_loss=True)
         total_loss = mse_loss + ssim_loss + msgm_loss
 
-        print(total_loss)
-        raise ValueError
-
         return {
             'mse': mse_loss,
             'ssim': ssim_loss,

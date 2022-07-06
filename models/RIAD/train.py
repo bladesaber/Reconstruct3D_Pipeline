@@ -32,8 +32,10 @@ def parse_args():
     parser.add_argument('--accumulate', type=int, default=1)
     parser.add_argument('--max_epoches', type=int, default=300)
 
-    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--lr_update_patient', type=int, default=10)
+    parser.add_argument('--width', type=int, default=640)
+    parser.add_argument('--height', type=int, default=480)
 
     parser.add_argument('--warmup', type=int, default=10)
     parser.add_argument('--checkpoint_interval', type=int, default=1)
@@ -58,7 +60,8 @@ def main():
         mask_dir=args.mask_dir,
         channel_first=True,
         with_aug=False,
-        with_normalize=True
+        with_normalize=True,
+        width=args.width, height=args.height,
     )
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
@@ -85,7 +88,10 @@ def main():
 
         current_lr = optimizer.param_groups[0]['lr']
 
-        batch_losses = []
+        batch_mse_losses = []
+        batch_ssim_losses = []
+        batch_msgm_losses = []
+        batch_total_losses = []
         for i, data_batch in enumerate(dataloader):
             step += 1
 
@@ -117,24 +123,37 @@ def main():
             )
             print(s)
 
-        # logger.add_scalar('loss', curr_loss, global_step=epoch)
-        # logger.add_scalar('lr', current_lr, global_step=epoch)
-        # print('###### epoch:%d loss:%f acc:%f \n' % (epoch, curr_loss, curr_acc))
-        #
-        # epoch += 1
-        #
-        # if (epoch > args.warmup) and (epoch % args.checkpoint_interval == 0):
-        #     scheduler.step(curr_loss)
-        #     saver.save(network)
-        #
-        #     if current_lr < args.minimum_lr:
-        #         break
-        #
-        # if epoch > args.max_epoches:
-        #     break
+            batch_mse_losses.append(loss_mse_float)
+            batch_ssim_losses.append(loss_ssim_float)
+            batch_msgm_losses.append(loss_msgm_float)
+            batch_total_losses.append(loss_total_float)
 
-        break
+        cur_mse_loss = np.mean(batch_mse_losses)
+        cur_ssim_loss = np.mean(batch_ssim_losses)
+        cur_msgm_loss = np.mean(batch_msgm_losses)
+        cur_total_loss = np.mean(batch_total_losses)
+        logger.add_scalar('mse_loss', cur_mse_loss, global_step=epoch)
+        logger.add_scalar('ssim_loss', cur_ssim_loss, global_step=epoch)
+        logger.add_scalar('msgm_loss', cur_msgm_loss, global_step=epoch)
+        logger.add_scalar('total_loss', cur_total_loss, global_step=epoch)
+        logger.add_scalar('lr', current_lr, global_step=epoch)
+        print('###### epoch:%d lr:%1.7f loss:%5.5f mse:%.3f ssim:%.3f msgm:%.3f \n' %
+              (epoch, current_lr, cur_total_loss, cur_mse_loss, cur_ssim_loss, cur_msgm_loss)
+              )
 
+        epoch += 1
+
+        if (epoch > args.warmup) and (epoch % args.checkpoint_interval == 0):
+            scheduler.step(cur_total_loss)
+            saver.save(network, score=cur_total_loss, epoch=epoch)
+
+            if current_lr < args.minimum_lr:
+                break
+
+        if epoch > args.max_epoches:
+            break
+
+    saver.save(network, score=cur_total_loss, epoch=epoch)
 
 if __name__ == '__main__':
     main()
