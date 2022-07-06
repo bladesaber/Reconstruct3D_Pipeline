@@ -1,5 +1,7 @@
 import argparse
 import os
+
+import cv2
 from torch.utils.data import DataLoader
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -34,8 +36,8 @@ def parse_args():
 
     parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--lr_update_patient', type=int, default=10)
-    parser.add_argument('--width', type=int, default=640)
-    parser.add_argument('--height', type=int, default=480)
+    parser.add_argument('--width', type=int, default=320)
+    parser.add_argument('--height', type=int, default=240)
 
     parser.add_argument('--warmup', type=int, default=10)
     parser.add_argument('--checkpoint_interval', type=int, default=1)
@@ -53,6 +55,9 @@ def main():
         os.mkdir(os.path.join(save_dir, 'checkpoints'))
 
     logger = SummaryWriter(log_dir=save_dir)
+    vis_dir = os.path.join(save_dir, 'vis')
+    if not os.path.exists(vis_dir):
+        os.mkdir(vis_dir)
 
     network = UNet()
     dataset = CustomDataset(
@@ -127,6 +132,13 @@ def main():
             batch_ssim_losses.append(loss_ssim_float)
             batch_msgm_losses.append(loss_msgm_float)
             batch_total_losses.append(loss_total_float)
+
+        rimgs = loss_dict['rimgs'].detach().cpu().numpy()
+        rimgs = np.transpose(rimgs, (0, 2, 3, 1))
+        rimgs = (rimgs * 255.).astype(np.uint8)
+        for rimg_id in range(rimgs.shape[0]):
+            rimg = rimgs[rimg_id, ...]
+            cv2.imwrite(os.path.join(vis_dir, "epoch_%d_%d.jpg"%(epoch, rimg_id)), rimg)
 
         cur_mse_loss = np.mean(batch_mse_losses)
         cur_ssim_loss = np.mean(batch_ssim_losses)

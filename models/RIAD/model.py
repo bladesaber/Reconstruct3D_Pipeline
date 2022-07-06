@@ -125,7 +125,9 @@ class UNet(nn.Module):
                 in_channels=64, out_channels=3,
                 kernel_size=3, stride=1, padding=1
             ),
-            nn.Tanh()
+
+            # nn.Tanh()
+            nn.Sigmoid()
         )
 
         if is_training:
@@ -172,6 +174,11 @@ class UNet(nn.Module):
             mask = mask.unsqueeze(1)
             mb_reconst += mb_inpaint * (1 - mask)
 
+        mb_reconst = mb_reconst / mask_num
+
+        # temp = mb_reconst.detach().cpu().numpy()
+        # print(temp.max(), temp.min())
+
         mse_loss = self.mse_loss_fn(mb_reconst, imgs)
         ssim_loss = self.ssim_loss_fn(mb_reconst, imgs, as_loss=True)
         msgm_loss = self.msgm_loss_fn(mb_reconst, imgs, as_loss=True)
@@ -181,5 +188,6 @@ class UNet(nn.Module):
             'mse': mse_loss,
             'ssim': ssim_loss,
             'msgm': msgm_loss,
-            'total': total_loss
+            'total': total_loss,
+            'rimgs': mb_reconst
         }
