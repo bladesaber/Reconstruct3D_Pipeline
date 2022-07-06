@@ -54,9 +54,11 @@ class CustomDataset(Dataset):
         obj_mask_path = os.path.join(self.mask_dir, path)
 
         img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         obj_multi_mask = cv2.imread(obj_mask_path, cv2.IMREAD_UNCHANGED)
+        img, _ = self.post_process(img, obj_multi_mask)
+
         obj_mask = np.zeros(obj_multi_mask.shape)
         obj_mask[np.bitwise_and(obj_multi_mask>100, obj_multi_mask<128)] = 1
 
@@ -76,11 +78,13 @@ class CustomDataset(Dataset):
         )
 
         disjoint_imgs = []
-        random_color = np.random.randint(0, 255, (3,))
+        # random_color = np.random.randint(0, 255, (3,))
+        fill_color = np.array([0, 0, 0])
         for disjoint_id in range(self.num_disjoint_masks):
             disjoint_mask = disjoint_masks[disjoint_id, :, :]
             disjoint_img = img * disjoint_mask[..., np.newaxis]
-            disjoint_img[obj_mask == 0, :] = random_color
+            # disjoint_img[obj_mask == 0, :] = random_color
+            disjoint_img[obj_mask == 0, :] = fill_color
 
             disjoint_mask[obj_mask == 0] = 1
             disjoint_masks[disjoint_id, :, :] = disjoint_mask
@@ -125,6 +129,31 @@ class CustomDataset(Dataset):
 
         return disjoint_masks
 
+    def post_process(self, rgb_img, label_img):
+        mask = np.zeros(label_img.shape, dtype=np.uint8)
+        mask[label_img < 100] = 0
+        mask[label_img > 128] = 0
+        mask[np.bitwise_and(label_img < 140, label_img > 80)] = 1
+
+        num_labels, labels, stats, centers = cv2.connectedComponentsWithStats(
+            mask, connectivity=8, ltype=cv2.CV_32S
+        )
+
+        select_area, select_label = 0, -1
+        for idx in range(1, num_labels, 1):
+            x, y, w, h, area = stats[idx]
+
+            if area > select_area:
+                select_area = area
+                select_label = idx
+
+        mask = np.zeros(label_img.shape, dtype=np.uint8)
+        mask[labels == select_label] = 255
+
+        rgb_img[mask != 255, :] = 0
+
+        return rgb_img, mask
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
@@ -136,13 +165,12 @@ if __name__ == '__main__':
 
     for img, masks, mask_imgs in dataset:
 
-        plt.figure('rgb')
-        plt.imshow(img)
-
         for mimg_id in range(mask_imgs.shape[0]):
             mimg = mask_imgs[mimg_id, ...]
             mask = masks[mimg_id, ...]
 
+            plt.figure('rgb')
+            plt.imshow(img)
             plt.figure('%d_img'%mimg_id)
             plt.imshow(mimg)
             plt.figure('%d_mask' % mimg_id)

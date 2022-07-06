@@ -126,8 +126,8 @@ class UNet(nn.Module):
                 kernel_size=3, stride=1, padding=1
             ),
 
-            # nn.Tanh()
-            nn.Sigmoid()
+            nn.Tanh()
+            # nn.Sigmoid()
         )
 
         if is_training:
@@ -174,8 +174,7 @@ class UNet(nn.Module):
             mask = mask.unsqueeze(1)
             mb_reconst += mb_inpaint * (1 - mask)
 
-        mb_reconst = mb_reconst / mask_num
-
+        # mb_reconst = mb_reconst / mask_num
         # temp = mb_reconst.detach().cpu().numpy()
         # print(temp.max(), temp.min())
 

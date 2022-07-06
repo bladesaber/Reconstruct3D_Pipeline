@@ -136,9 +136,14 @@ def main():
         rimgs = loss_dict['rimgs'].detach().cpu().numpy()
         rimgs = np.transpose(rimgs, (0, 2, 3, 1))
         rimgs = (rimgs * 255.).astype(np.uint8)
+        batch_imgs_float = batch_imgs.detach().cpu().numpy()
+        batch_imgs_float = np.transpose(batch_imgs_float, (0, 2, 3, 1))
+        batch_imgs_float = (batch_imgs_float * 255.).astype(np.uint8)
         for rimg_id in range(rimgs.shape[0]):
             rimg = rimgs[rimg_id, ...]
-            cv2.imwrite(os.path.join(vis_dir, "epoch_%d_%d.jpg"%(epoch, rimg_id)), rimg)
+            bimg = batch_imgs_float[rimg_id, ...]
+            cv2.imwrite(os.path.join(vis_dir, "fake_epoch%d_id%d.jpg"%(epoch, rimg_id)), rimg)
+            cv2.imwrite(os.path.join(vis_dir, "real_epoch%d_id%d.jpg" % (epoch, rimg_id)), bimg)
 
         cur_mse_loss = np.mean(batch_mse_losses)
         cur_ssim_loss = np.mean(batch_ssim_losses)
