@@ -1,66 +1,187 @@
+import argparse
+import os
 import cv2
-import numpy as np
-import matplotlib.pyplot as plt
-
-orig = cv2.imread('/home/quan/Desktop/company/dirty_dataset/test_img/test/result/1/1.jpg')
-cut2 = cv2.imread('/home/quan/Desktop/company/dirty_dataset/test_img/test/result/1/cut_2.jpg')
-cut4 = cv2.imread('/home/quan/Desktop/company/dirty_dataset/test_img/test/result/1/cut_4.jpg')
-cut8 = cv2.imread('/home/quan/Desktop/company/dirty_dataset/test_img/test/result/1/cut_8.jpg')
-
-
-# dif = np.abs(cut2 - orig)
-# cv2.imshow('d', dif)
-# cv2.waitKey(0)
-
-# cv2.imshow('orig', orig)
-# cv2.imshow('cut2', cut2)
-# cv2.waitKey(0)
-
-from models.RIAD.loss_utils import MSGMSLoss
 import torch
+import numpy as np
+import math
+from typing import Tuple
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
-msgm_loss_fn = MSGMSLoss(num_scales=4)
+from models.RIAD.model import UNet
 
-orig_d = (np.transpose(orig, (2, 0, 1))[np.newaxis, ...]).astype(np.float32) / 255.
-cut2_d = (np.transpose(cut2, (2, 0, 1))[np.newaxis, ...]).astype(np.float32) / 255.
-cut4_d = (np.transpose(cut4, (2, 0, 1))[np.newaxis, ...]).astype(np.float32) / 255.
-cut8_d = (np.transpose(cut8, (2, 0, 1))[np.newaxis, ...]).astype(np.float32) / 255.
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train a detector')
 
-orig_d = torch.from_numpy(orig_d)
-cut2_d = torch.from_numpy(cut2_d)
-cut4_d = torch.from_numpy(cut4_d)
-cut8_d = torch.from_numpy(cut8_d)
+    parser.add_argument('--weight', type=str, help='',
+                        default='/home/psdz/HDD/quan/output/experiment_1/checkpoints/model_last.pth')
+    parser.add_argument('--device', type=str, default='cuda')
 
-r_cut2 = msgm_loss_fn(orig_d, cut2_d, as_loss=False)
-r_cut2 = r_cut2.cpu().numpy()
-r_cut2 = np.transpose(r_cut2[0, ...], (1, 2, 0))
-r_cut2 = r_cut2[:, :, 0]
+    parser.add_argument('--mask_dir', type=str, help='',
+                        default='/home/psdz/HDD/quan/output/test/mask')
+    parser.add_argument('--img_dir', type=str, help='',
+                        default='/home/psdz/HDD/quan/output/test/img')
+    parser.add_argument('--width', type=int, default=640)
+    parser.add_argument('--height', type=int, default=480)
 
-r_cut4 = msgm_loss_fn(orig_d, cut4_d, as_loss=False)
-r_cut4 = r_cut4.cpu().numpy()
-r_cut4 = np.transpose(r_cut4[0, ...], (1, 2, 0))
-r_cut4 = r_cut4[:, :, 0]
+    args = parser.parse_args()
+    return args
 
-r = (r_cut2 + r_cut4)/2.0
 
-r_max = r.max()
-r = (r - r.min())/(r.max()-r.min())
-# plt.figure('r')
-# plt.imshow(r)
-# plt.show()
+def post_process(rgb_img, label_img):
+    mask = np.zeros(label_img.shape, dtype=np.uint8)
+    mask[label_img < 100] = 0
+    mask[label_img > 128] = 0
+    mask[np.bitwise_and(label_img < 140, label_img > 80)] = 1
 
-defect_mask = np.zeros(r.shape, dtype=np.uint8)
-defect_mask[r>0.3] = 255
+    num_labels, labels, stats, centers = cv2.connectedComponentsWithStats(
+        mask, connectivity=8, ltype=cv2.CV_32S
+    )
 
-show_img = orig.copy()
-contours, hierarchy = cv2.findContours(defect_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-for c_id in range(len(contours)):
-    cv2.drawContours(show_img, contours, c_id, (0, 0, 255), 1)
-cv2.putText(show_img, 'Score:%f' % r_max, org=(5, 20),
-            fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.8,
-            color=(0, 0, 255), thickness=1)
+    select_area, select_label = 0, -1
+    for idx in range(1, num_labels, 1):
+        x, y, w, h, area = stats[idx]
 
-cv2.imshow('orig', orig)
-cv2.imshow('show', show_img)
-cv2.imshow('cut2', cut2)
-cv2.waitKey(0)
+        if area > select_area:
+            select_area = area
+            select_label = idx
+
+    mask = np.zeros(label_img.shape, dtype=np.uint8)
+    mask[labels == select_label] = 255
+
+    rgb_img[mask != 255, :] = 0
+
+    return rgb_img, mask
+
+def create_disjoint_masks(
+        img_size: Tuple[int, int],
+        cutout_size: int = 8,
+        num_disjoint_masks: int = 3,
+):
+    img_h, img_w = img_size
+    grid_h = math.ceil(img_h / cutout_size)
+    grid_w = math.ceil(img_w / cutout_size)
+    num_grids = grid_h * grid_w
+
+    disjoint_masks = []
+    for grid_ids in np.array_split(np.random.permutation(num_grids), num_disjoint_masks):
+        flatten_mask = np.ones(num_grids)
+        flatten_mask[grid_ids] = 0
+        mask = flatten_mask.reshape((grid_h, grid_w))
+        mask = mask.repeat(cutout_size, axis=0).repeat(cutout_size, axis=1)
+        disjoint_masks.append(mask)
+
+    disjoint_masks = np.array(disjoint_masks)
+
+    return disjoint_masks
+
+def parse_img(
+        img, mask,
+        cutout_size, num_disjoint_masks=3,
+        with_normalize=True, channel_first=False,
+):
+    h, w, c = img.shape
+    disjoint_masks = create_disjoint_masks(
+        (h, w),
+        cutout_size=cutout_size,
+        num_disjoint_masks=num_disjoint_masks
+    )
+
+    disjoint_imgs = []
+    # random_color = np.random.randint(0, 255, (3,))
+    fill_color = np.array([0, 0, 0])
+    for disjoint_id in range(num_disjoint_masks):
+        disjoint_mask = disjoint_masks[disjoint_id, :, :]
+        disjoint_img = img * disjoint_mask[..., np.newaxis]
+        # disjoint_img[obj_mask == 0, :] = random_color
+        disjoint_img[mask == 0, :] = fill_color
+
+        disjoint_mask[mask == 0] = 1
+        disjoint_masks[disjoint_id, :, :] = disjoint_mask
+
+        disjoint_imgs.append(disjoint_img)
+    disjoint_imgs = np.array(disjoint_imgs)
+
+    if channel_first:
+        img = np.transpose(img, (2, 0, 1))
+        disjoint_imgs = np.transpose(disjoint_imgs, (0, 3, 1, 2))
+
+    if with_normalize:
+        img = img / 255.
+        disjoint_imgs = disjoint_imgs / 255.
+
+    return img.astype(np.float32), disjoint_masks.astype(np.float32), disjoint_imgs.astype(np.float32)
+
+
+def main():
+    args = parse_args()
+
+    device = args.device
+
+    network = UNet()
+    weight = torch.load(args.weight)['state_dict']
+    network.load_state_dict(weight)
+    if device == 'cuda':
+        network = network.to(torch.device('cuda:0'))
+    network.eval()
+
+    cutout_sizes = (2, 4, 8)
+
+    for path in tqdm(os.listdir(args.img_dir)):
+        img_path = os.path.join(args.img_dir, path)
+        mask_path = os.path.join(args.mask_dir, path)
+
+        img = cv2.imread(img_path)
+        mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
+        img, mask = post_process(img, mask)
+
+        img = cv2.resize(img, (args.width, args.height))
+        mask = cv2.resize(mask, (args.width, args.height))
+
+        name = path.split('.')[0]
+        name_dir = os.path.join('/home/psdz/HDD/quan/output/test/result', name)
+        if not os.path.exists(name_dir):
+            os.mkdir(name_dir)
+        cv2.imwrite(
+            os.path.join(name_dir, path), img
+        )
+
+        for cutout_size in cutout_sizes:
+            _, disjoint_masks, disjoint_imgs = parse_img(
+                img=img, mask=mask,
+                cutout_size=cutout_size, num_disjoint_masks=3,
+                with_normalize=True, channel_first=True
+            )
+
+            ### debug
+            # for mask_id in range(disjoint_masks.shape[0]):
+            #     plt.figure('rgb')
+            #     plt.imshow(img)
+            #     plt.figure('mask')
+            #     plt.imshow(disjoint_masks[mask_id, ...])
+            #     plt.figure('mask_img')
+            #     plt.imshow(disjoint_imgs[mask_id, ...])
+            #     plt.show()
+
+            disjoint_imgs = disjoint_imgs[np.newaxis, ...]
+            disjoint_masks = disjoint_masks[np.newaxis, ...]
+            disjoint_masks = torch.from_numpy(disjoint_masks)
+            disjoint_imgs = torch.from_numpy(disjoint_imgs)
+            if device == 'cuda':
+                disjoint_masks = disjoint_masks.to(torch.device('cuda:0'))
+                disjoint_imgs = disjoint_imgs.to(torch.device('cuda:0'))
+
+                rimg = network.infer(disjoint_masks=disjoint_masks, mask_imgs=disjoint_imgs)
+                rimg = rimg.detach().cpu().numpy()[0, ...]
+                rimg = np.transpose(rimg, (1, 2, 0))
+                rimg = (rimg * 255.).astype(np.uint8)
+
+                # plt.imshow(rimg)
+                # plt.show()
+
+                cv2.imwrite(
+                    os.path.join(name_dir, 'cut_%d.jpg' % cutout_size), rimg
+                )
+
+if __name__ == '__main__':
+    main()

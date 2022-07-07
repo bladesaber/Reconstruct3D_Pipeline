@@ -158,8 +158,8 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
     dataset = CustomDataset(
-        img_dir='/home/quan/Desktop/company/dirty_dataset/RAID/images',
-        mask_dir='/home/quan/Desktop/company/dirty_dataset/RAID/masks',
+        img_dir='/home/psdz/HDD/quan/RAID/images',
+        mask_dir='/home/psdz/HDD/quan/RAID/masks',
         num_disjoint_masks=4, channel_first=False, with_aug=False, with_normalize=True
     )
 

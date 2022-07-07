@@ -150,6 +150,20 @@ class UNet(nn.Module):
 
         return x
 
+    def infer(self, disjoint_masks, mask_imgs):
+        mb_reconst = 0
+        mask_num = disjoint_masks.shape[1]
+
+        for mask_id in range(mask_num):
+            mask_img = mask_imgs[:, mask_id, :, :, :]
+            mask = disjoint_masks[:, mask_id, :, :]
+
+            mb_inpaint = self.forward(mask_img)
+            mask = mask.unsqueeze(1)
+            mb_reconst += mb_inpaint * (1 - mask)
+
+        return mb_reconst
+
     def train_step(self, imgs, disjoint_masks, mask_imgs):
         mb_reconst = 0
         mask_num = disjoint_masks.shape[1]

@@ -17,15 +17,15 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
 
     parser.add_argument('--experient', type=str, help='',
-                        default='experiment_2')
+                        default='experiment_1')
     parser.add_argument('--save_dir', type=str, help='',
-                        default='/home/quan/Desktop/tempary/output')
+                        default='/home/psdz/HDD/quan/output')
     parser.add_argument('--mask_dir', type=str, help='',
-                        default='/home/quan/Desktop/company/dirty_dataset/RAID/masks')
+                        default='/home/psdz/HDD/quan/RAID/masks')
     parser.add_argument('--img_dir', type=str, help='',
-                        default='/home/quan/Desktop/company/dirty_dataset/RAID/images')
+                        default='/home/psdz/HDD/quan/RAID/images')
 
-    parser.add_argument('--device', type=str, default='cpu')
+    parser.add_argument('--device', type=str, default='cuda')
 
     parser.add_argument('--optimizer_type', type=str, help='', default='Adam')
     parser.add_argument('--lr', type=float, default=0.01)
@@ -36,8 +36,8 @@ def parse_args():
 
     parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--lr_update_patient', type=int, default=10)
-    parser.add_argument('--width', type=int, default=320)
-    parser.add_argument('--height', type=int, default=240)
+    parser.add_argument('--width', type=int, default=640)
+    parser.add_argument('--height', type=int, default=480)
 
     parser.add_argument('--warmup', type=int, default=10)
     parser.add_argument('--checkpoint_interval', type=int, default=1)
@@ -142,7 +142,7 @@ def main():
         for rimg_id in range(rimgs.shape[0]):
             rimg = rimgs[rimg_id, ...]
             bimg = batch_imgs_float[rimg_id, ...]
-            cv2.imwrite(os.path.join(vis_dir, "fake_epoch%d_id%d.jpg"%(epoch, rimg_id)), rimg)
+            cv2.imwrite(os.path.join(vis_dir, "fake_epoch%d_id%d.jpg" % (epoch, rimg_id)), rimg)
             cv2.imwrite(os.path.join(vis_dir, "real_epoch%d_id%d.jpg" % (epoch, rimg_id)), bimg)
 
         cur_mse_loss = np.mean(batch_mse_losses)
