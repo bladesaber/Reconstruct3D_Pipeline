@@ -2,19 +2,16 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-orig = cv2.imread('/home/quan/Desktop/company/dirty_dataset/test_img/test/result/1/1.jpg')
-cut2 = cv2.imread('/home/quan/Desktop/company/dirty_dataset/test_img/test/result/1/cut_2.jpg')
-cut4 = cv2.imread('/home/quan/Desktop/company/dirty_dataset/test_img/test/result/1/cut_4.jpg')
-cut8 = cv2.imread('/home/quan/Desktop/company/dirty_dataset/test_img/test/result/1/cut_8.jpg')
+orig = cv2.imread('/home/psdz/HDD/quan/output/test/result/20220707_154741/3/orig.jpg')
+cut2 = cv2.imread('/home/psdz/HDD/quan/output/test/result/20220707_154741/3/cut_2.jpg')
+cut4 = cv2.imread('/home/psdz/HDD/quan/output/test/result/20220707_154741/3/cut_4.jpg')
+cut8 = cv2.imread('/home/psdz/HDD/quan/output/test/result/20220707_154741/3/cut_8.jpg')
 
+orig_blur = cv2.GaussianBlur(orig, ksize=(3, 3), sigmaX=1, sigmaY=1)
+cut2 = cv2.GaussianBlur(cut2, ksize=(3, 3), sigmaX=1, sigmaY=1)
+cut4 = cv2.GaussianBlur(cut4, ksize=(3, 3), sigmaX=1, sigmaY=1)
 
-# dif = np.abs(cut2 - orig)
-# cv2.imshow('d', dif)
-# cv2.waitKey(0)
-
-# cv2.imshow('orig', orig)
-# cv2.imshow('cut2', cut2)
-# cv2.waitKey(0)
+orig = orig_blur
 
 from models.RIAD.loss_utils import MSGMSLoss
 import torch
@@ -24,12 +21,12 @@ msgm_loss_fn = MSGMSLoss(num_scales=4)
 orig_d = (np.transpose(orig, (2, 0, 1))[np.newaxis, ...]).astype(np.float32) / 255.
 cut2_d = (np.transpose(cut2, (2, 0, 1))[np.newaxis, ...]).astype(np.float32) / 255.
 cut4_d = (np.transpose(cut4, (2, 0, 1))[np.newaxis, ...]).astype(np.float32) / 255.
-cut8_d = (np.transpose(cut8, (2, 0, 1))[np.newaxis, ...]).astype(np.float32) / 255.
+# cut8_d = (np.transpose(cut8, (2, 0, 1))[np.newaxis, ...]).astype(np.float32) / 255.
 
 orig_d = torch.from_numpy(orig_d)
 cut2_d = torch.from_numpy(cut2_d)
 cut4_d = torch.from_numpy(cut4_d)
-cut8_d = torch.from_numpy(cut8_d)
+# cut8_d = torch.from_numpy(cut8_d)
 
 r_cut2 = msgm_loss_fn(orig_d, cut2_d, as_loss=False)
 r_cut2 = r_cut2.cpu().numpy()

@@ -28,6 +28,7 @@ class CustomDataset(Dataset):
         self.channel_first = channel_first
         self.with_normalize = with_normalize
         self.with_aug = with_aug
+        self.n_points_list = list(range(1, 6))
 
         self.cutout_sizes = cutout_sizes
         self.num_disjoint_masks = num_disjoint_masks
@@ -38,13 +39,49 @@ class CustomDataset(Dataset):
     def get_albu_parser(self):
         transform = albu.Compose([
             # albu.GaussianBlur(blur_limit=(1, 3), p=0.5),
-            albu.HueSaturationValue(p=0.5),
+            # albu.HueSaturationValue(p=0.5),
             # albu.RandomBrightness(p=0.5),
             # albu.RandomContrast(p=0.5)
+            albu.GaussNoise(var_limit=(10, 15), p=1.0)
+            # albu.ISONoise(p=1.0, color_shift=(0.01, 0.02), intensity=(0.1, 0.15)),
             # albu.Normalize(),
             # ToTensorV2()
         ])
         return transform
+
+    def draw_random_line(self, img, n_points, thickness_range=(2, 3, )):
+        width, height, c = img.shape
+
+        for idx in range(n_points):
+            if random.uniform(0.0, 1.0)>0.5:
+                x_from, y_from = 0, int(random.uniform(0.0, 1.0)*height)
+                x_to, y_to = width, int(random.uniform(0.0, 1.0)*height)
+            else:
+                x_from, y_from = int(random.uniform(0.0, 1.0) * width), 0
+                x_to, y_to = int(random.uniform(0.0, 1.0) * width), height
+
+            random_color = np.random.randint(0, 255, (3, ))
+            random_color = (int(random_color[0]), int(random_color[1]), int(random_color[2]))
+            thickness = random.choice(thickness_range)
+            img = cv2.line(img, (y_from, x_from), (y_to, x_to), color=random_color, thickness=thickness,)
+
+        return img
+
+    def draw_random_circle(self, img, n_points, radius=(0.01, 0.02, 0.03), thickness_range=(1, 2, 3)):
+        width, height, c = img.shape
+        x_normalized = np.random.uniform(0.0, 1.0, n_points)
+        y_normalized = np.random.uniform(0.0, 1.0, n_points)
+
+        length = min(width, height)
+        for idx in range(n_points):
+            r = int(random.choice(radius) * length)
+            x, y = int(x_normalized[idx] * width), int(y_normalized[idx] * height)
+            thickness = random.choice(thickness_range)
+            random_color = np.random.randint(0, 255, (3,))
+            random_color = (int(random_color[0]), int(random_color[1]), int(random_color[2]))
+            img = cv2.circle(img, center=(x, y), radius=r, color=random_color, thickness=thickness)
+
+        return img
 
     def __getitem__(self, index):
         index = index % self.num
@@ -62,10 +99,6 @@ class CustomDataset(Dataset):
         obj_mask = np.zeros(obj_multi_mask.shape)
         obj_mask[np.bitwise_and(obj_multi_mask>100, obj_multi_mask<128)] = 1
 
-        if self.with_aug:
-            transformed = self.transformer_albu(image=img)
-            img = transformed["image"]
-
         img = cv2.resize(img, (self.img_width, self.img_height))
         obj_mask = cv2.resize(obj_mask, (self.img_width, self.img_height))
 
@@ -77,12 +110,29 @@ class CustomDataset(Dataset):
             num_disjoint_masks=self.num_disjoint_masks
         )
 
+        r_img = img.copy()
+        if random.uniform(0.0, 1.0)>0.5:
+            n_points = random.choice(self.n_points_list)
+            r_img = self.draw_random_line(r_img, n_points=n_points)
+            # if random.uniform(0.0, 1.0)>0.5:
+            #     r_img = self.draw_random_line(r_img, n_points=n_points)
+            # else:
+            #     r_img = self.draw_random_circle(r_img, n_points=n_points)
+
+        if self.with_aug:
+            transformed = self.transformer_albu(image=r_img)
+            r_img = transformed["image"]
+
+        r_img = cv2.cvtColor(r_img, cv2.COLOR_BGR2RGB)
+        plt.imshow(r_img)
+        plt.show()
+
         disjoint_imgs = []
         # random_color = np.random.randint(0, 255, (3,))
         fill_color = np.array([0, 0, 0])
         for disjoint_id in range(self.num_disjoint_masks):
             disjoint_mask = disjoint_masks[disjoint_id, :, :]
-            disjoint_img = img * disjoint_mask[..., np.newaxis]
+            disjoint_img = r_img * disjoint_mask[..., np.newaxis]
             # disjoint_img[obj_mask == 0, :] = random_color
             disjoint_img[obj_mask == 0, :] = fill_color
 
@@ -158,10 +208,17 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
     dataset = CustomDataset(
-        img_dir='/home/psdz/HDD/quan/RAID/images',
-        mask_dir='/home/psdz/HDD/quan/RAID/masks',
-        num_disjoint_masks=4, channel_first=False, with_aug=False, with_normalize=True
+        img_dir='/home/quan/Desktop/company/dirty_dataset/RAID/images',
+        mask_dir='/home/quan/Desktop/company/dirty_dataset/RAID/masks',
+        num_disjoint_masks=4, channel_first=False, with_aug=True, with_normalize=True
     )
+
+    # img = cv2.imread('/home/quan/Desktop/company/dirty_dataset/RAID/images/20220706_170502_5.jpg')
+    # img = cv2.resize(img, (640, 480))
+    # img = dataset.draw_random_line(img, n_points=5)
+    # # img = dataset.draw_random_circle(img, n_points=5)
+    # cv2.imshow('d', img)
+    # cv2.waitKey(0)
 
     for img, masks, mask_imgs in dataset:
 

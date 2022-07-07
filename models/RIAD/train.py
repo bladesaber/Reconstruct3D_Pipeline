@@ -67,6 +67,7 @@ def main():
         with_aug=False,
         with_normalize=True,
         width=args.width, height=args.height,
+        cutout_sizes=(2, 4), num_disjoint_masks=3
     )
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 

@@ -7,6 +7,7 @@ import math
 from typing import Tuple
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import datetime
 
 from models.RIAD.model import UNet
 
@@ -18,9 +19,11 @@ def parse_args():
     parser.add_argument('--device', type=str, default='cuda')
 
     parser.add_argument('--mask_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/output/test/mask')
+                        default='/home/psdz/HDD/quan/car3/car2')
     parser.add_argument('--img_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/output/test/img')
+                        default='/home/psdz/HDD/quan/car3/CAR_TEST')
+    parser.add_argument('--save_dir', type=str,
+                        default='/home/psdz/HDD/quan/output/test/result')
     parser.add_argument('--width', type=int, default=640)
     parser.add_argument('--height', type=int, default=480)
 
@@ -113,10 +116,11 @@ def parse_img(
     return img.astype(np.float32), disjoint_masks.astype(np.float32), disjoint_imgs.astype(np.float32)
 
 
-def main():
+def main_with_mask():
     args = parse_args()
 
     device = args.device
+    time_tag = (datetime.datetime.now()).strftime("%Y%m%d_%H%M%S")
 
     network = UNet()
     weight = torch.load(args.weight)['state_dict']
@@ -125,25 +129,31 @@ def main():
         network = network.to(torch.device('cuda:0'))
     network.eval()
 
-    cutout_sizes = (2, 4, 8)
+    save_dir = os.path.join(args.save_dir, time_tag)
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
 
+    cutout_sizes = (2, 4, 8)
     for path in tqdm(os.listdir(args.img_dir)):
         img_path = os.path.join(args.img_dir, path)
         mask_path = os.path.join(args.mask_dir, path)
 
         img = cv2.imread(img_path)
         mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
+        if mask.ndim == 3:
+            mask = mask[:, :, 0]
+
         img, mask = post_process(img, mask)
 
         img = cv2.resize(img, (args.width, args.height))
         mask = cv2.resize(mask, (args.width, args.height))
 
         name = path.split('.')[0]
-        name_dir = os.path.join('/home/psdz/HDD/quan/output/test/result', name)
+        name_dir = os.path.join(save_dir, name)
         if not os.path.exists(name_dir):
             os.mkdir(name_dir)
         cv2.imwrite(
-            os.path.join(name_dir, path), img
+            os.path.join(name_dir, 'orig.jpg'), img
         )
 
         for cutout_size in cutout_sizes:
@@ -184,4 +194,4 @@ def main():
                 )
 
 if __name__ == '__main__':
-    main()
+    main_with_mask()
