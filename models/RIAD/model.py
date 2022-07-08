@@ -131,7 +131,7 @@ class UNet(nn.Module):
         )
 
         if is_training:
-            self.mse_loss_fn = nn.MSELoss()
+            # self.mse_loss_fn = nn.MSELoss()
             self.ssim_loss_fn = SSIMLoss(kernel_size=11, sigma=0.5)
             self.msgm_loss_fn = MSGMSLoss(num_scales=4)
 
@@ -164,7 +164,7 @@ class UNet(nn.Module):
 
         return mb_reconst
 
-    def train_step(self, imgs, disjoint_masks, mask_imgs):
+    def train_step(self, imgs, disjoint_masks, mask_imgs, obj_masks):
         mb_reconst = 0
         mask_num = disjoint_masks.shape[1]
 
@@ -192,7 +192,11 @@ class UNet(nn.Module):
         # temp = mb_reconst.detach().cpu().numpy()
         # print(temp.max(), temp.min())
 
-        mse_loss = self.mse_loss_fn(mb_reconst, imgs)
+        # mse_loss = self.mse_loss_fn(mb_reconst, imgs)
+        dif = torch.pow((mb_reconst - imgs) * 255. * obj_masks, 2)
+        dif = torch.sqrt(torch.sum(dif, dim=(1, 2, 3)))/torch.sum(obj_masks, dim=(1, 2, 3))
+        mse_loss = dif.mean()
+
         ssim_loss = self.ssim_loss_fn(mb_reconst, imgs, as_loss=True)
         msgm_loss = self.msgm_loss_fn(mb_reconst, imgs, as_loss=True)
         total_loss = mse_loss + ssim_loss + msgm_loss

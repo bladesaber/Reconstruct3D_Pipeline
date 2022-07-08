@@ -42,7 +42,7 @@ class CustomDataset(Dataset):
             # albu.HueSaturationValue(p=0.5),
             # albu.RandomBrightness(p=0.5),
             # albu.RandomContrast(p=0.5)
-            albu.GaussNoise(var_limit=(10, 15), p=1.0)
+            albu.GaussNoise(var_limit=(10, 15), p=0.5)
             # albu.ISONoise(p=1.0, color_shift=(0.01, 0.02), intensity=(0.1, 0.15)),
             # albu.Normalize(),
             # ToTensorV2()
@@ -111,7 +111,7 @@ class CustomDataset(Dataset):
         )
 
         r_img = img.copy()
-        if random.uniform(0.0, 1.0)>0.5:
+        if random.uniform(0.0, 1.0)>0.3:
             n_points = random.choice(self.n_points_list)
             r_img = self.draw_random_line(r_img, n_points=n_points)
             # if random.uniform(0.0, 1.0)>0.5:
@@ -124,8 +124,8 @@ class CustomDataset(Dataset):
             r_img = transformed["image"]
 
         r_img = cv2.cvtColor(r_img, cv2.COLOR_BGR2RGB)
-        plt.imshow(r_img)
-        plt.show()
+        # plt.imshow(r_img)
+        # plt.show()
 
         disjoint_imgs = []
         # random_color = np.random.randint(0, 255, (3,))
@@ -145,12 +145,14 @@ class CustomDataset(Dataset):
         if self.channel_first:
             img = np.transpose(img, (2, 0, 1))
             disjoint_imgs = np.transpose(disjoint_imgs, (0, 3, 1, 2))
+            obj_mask = obj_mask[np.newaxis, ...]
 
         if self.with_normalize:
             img = img / 255.
             disjoint_imgs = disjoint_imgs / 255.
 
-        return img.astype(np.float32), disjoint_masks.astype(np.float32), disjoint_imgs.astype(np.float32)
+        return img.astype(np.float32), disjoint_masks.astype(np.float32), \
+               disjoint_imgs.astype(np.float32), obj_mask.astype(np.float32)
 
     def re_normalized(self, img):
         rimg = ((img-img.min())/(img.max()-img.min()) * 255.).astype(np.uint8)
@@ -220,32 +222,35 @@ if __name__ == '__main__':
     # cv2.imshow('d', img)
     # cv2.waitKey(0)
 
-    for img, masks, mask_imgs in dataset:
-
-        for mimg_id in range(mask_imgs.shape[0]):
-            mimg = mask_imgs[mimg_id, ...]
-            mask = masks[mimg_id, ...]
-
-            plt.figure('rgb')
-            plt.imshow(img)
-            plt.figure('%d_img'%mimg_id)
-            plt.imshow(mimg)
-            plt.figure('%d_mask' % mimg_id)
-            plt.imshow(mask)
-
-            plt.show()
-
-    # from torch.utils.data import DataLoader
+    # for img, masks, mask_imgs, obj_mask in dataset:
     #
-    # dataset = CustomDataset(
-    #     img_dir='/home/quan/Desktop/company/dirty_dataset/RAID/images',
-    #     mask_dir='/home/quan/Desktop/company/dirty_dataset/RAID/masks',
-    #     num_disjoint_masks=4, channel_first=True, with_normalize=False
-    # )
-    # dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
-    # for img, masks, mask_imgs in dataloader:
-    #     print(img.shape)
-    #     print(masks.shape)
-    #     print(mask_imgs.shape)
-    #     break
+    #     for mimg_id in range(mask_imgs.shape[0]):
+    #         mimg = mask_imgs[mimg_id, ...]
+    #         mask = masks[mimg_id, ...]
+    #
+    #         plt.figure('rgb')
+    #         plt.imshow(img)
+    #         plt.figure('%d_img'%mimg_id)
+    #         plt.imshow(mimg)
+    #         plt.figure('%d_mask' % mimg_id)
+    #         plt.imshow(mask)
+    #         plt.figure('obj_mask')
+    #         plt.imshow(obj_mask)
+    #
+    #         plt.show()
+
+    from torch.utils.data import DataLoader
+
+    dataset = CustomDataset(
+        img_dir='/home/quan/Desktop/company/dirty_dataset/RAID/images',
+        mask_dir='/home/quan/Desktop/company/dirty_dataset/RAID/masks',
+        num_disjoint_masks=4, channel_first=True, with_normalize=False
+    )
+    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+    for img, masks, mask_imgs, obj_masks in dataloader:
+        print(img.shape)
+        print(masks.shape)
+        print(mask_imgs.shape)
+        print(obj_masks.shape)
+        break
 

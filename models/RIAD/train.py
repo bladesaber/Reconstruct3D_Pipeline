@@ -19,13 +19,13 @@ def parse_args():
     parser.add_argument('--experient', type=str, help='',
                         default='experiment_1')
     parser.add_argument('--save_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/output')
+                        default='/home/quan/Desktop/tempary/output')
     parser.add_argument('--mask_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/RAID/masks')
+                        default='/home/quan/Desktop/company/dirty_dataset/RAID/masks')
     parser.add_argument('--img_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/RAID/images')
+                        default='/home/quan/Desktop/company/dirty_dataset/RAID/images')
 
-    parser.add_argument('--device', type=str, default='cuda')
+    parser.add_argument('--device', type=str, default='cpu')
 
     parser.add_argument('--optimizer_type', type=str, help='', default='Adam')
     parser.add_argument('--lr', type=float, default=0.01)
@@ -36,8 +36,8 @@ def parse_args():
 
     parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--lr_update_patient', type=int, default=10)
-    parser.add_argument('--width', type=int, default=640)
-    parser.add_argument('--height', type=int, default=480)
+    parser.add_argument('--width', type=int, default=320)
+    parser.add_argument('--height', type=int, default=240)
 
     parser.add_argument('--warmup', type=int, default=10)
     parser.add_argument('--checkpoint_interval', type=int, default=1)
@@ -101,16 +101,18 @@ def main():
         for i, data_batch in enumerate(dataloader):
             step += 1
 
-            batch_imgs, batch_masks, batch_mask_imgs = data_batch
+            batch_imgs, batch_masks, batch_mask_imgs, batch_obj_masks = data_batch
             if device == 'cuda':
                 batch_imgs = batch_imgs.to(torch.device('cuda:0'))
                 batch_masks = batch_masks.to(torch.device('cuda:0'))
                 batch_mask_imgs = batch_mask_imgs.to(torch.device('cuda:0'))
+                batch_obj_masks = batch_obj_masks.to(torch.device('cuda:0'))
 
             loss_dict = network.train_step(
                 imgs=batch_imgs,
                 disjoint_masks=batch_masks,
-                mask_imgs=batch_mask_imgs
+                mask_imgs=batch_mask_imgs,
+                obj_masks=batch_obj_masks
             )
 
             total_loss = loss_dict['total']
