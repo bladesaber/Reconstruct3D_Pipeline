@@ -123,10 +123,6 @@ class CustomDataset(Dataset):
             transformed = self.transformer_albu(image=r_img)
             r_img = transformed["image"]
 
-        r_img = cv2.cvtColor(r_img, cv2.COLOR_BGR2RGB)
-        # plt.imshow(r_img)
-        # plt.show()
-
         disjoint_imgs = []
         # random_color = np.random.randint(0, 255, (3,))
         fill_color = np.array([0, 0, 0])
@@ -222,35 +218,35 @@ if __name__ == '__main__':
     # cv2.imshow('d', img)
     # cv2.waitKey(0)
 
-    # for img, masks, mask_imgs, obj_mask in dataset:
-    #
-    #     for mimg_id in range(mask_imgs.shape[0]):
-    #         mimg = mask_imgs[mimg_id, ...]
-    #         mask = masks[mimg_id, ...]
-    #
-    #         plt.figure('rgb')
-    #         plt.imshow(img)
-    #         plt.figure('%d_img'%mimg_id)
-    #         plt.imshow(mimg)
-    #         plt.figure('%d_mask' % mimg_id)
-    #         plt.imshow(mask)
-    #         plt.figure('obj_mask')
-    #         plt.imshow(obj_mask)
-    #
-    #         plt.show()
+    for img, masks, mask_imgs, obj_mask in dataset:
 
-    from torch.utils.data import DataLoader
+        for mimg_id in range(mask_imgs.shape[0]):
+            mimg = mask_imgs[mimg_id, ...]
+            mask = masks[mimg_id, ...]
 
-    dataset = CustomDataset(
-        img_dir='/home/quan/Desktop/company/dirty_dataset/RAID/images',
-        mask_dir='/home/quan/Desktop/company/dirty_dataset/RAID/masks',
-        num_disjoint_masks=4, channel_first=True, with_normalize=False
-    )
-    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
-    for img, masks, mask_imgs, obj_masks in dataloader:
-        print(img.shape)
-        print(masks.shape)
-        print(mask_imgs.shape)
-        print(obj_masks.shape)
-        break
+            plt.figure('rgb')
+            plt.imshow(img)
+            plt.figure('%d_img'%mimg_id)
+            plt.imshow(mimg)
+            plt.figure('%d_mask' % mimg_id)
+            plt.imshow(mask)
+            plt.figure('obj_mask')
+            plt.imshow(obj_mask)
+
+            plt.show()
+
+    # from torch.utils.data import DataLoader
+    #
+    # dataset = CustomDataset(
+    #     img_dir='/home/quan/Desktop/company/dirty_dataset/RAID/images',
+    #     mask_dir='/home/quan/Desktop/company/dirty_dataset/RAID/masks',
+    #     num_disjoint_masks=4, channel_first=True, with_normalize=False
+    # )
+    # dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+    # for img, masks, mask_imgs, obj_masks in dataloader:
+    #     print(img.shape)
+    #     print(masks.shape)
+    #     print(mask_imgs.shape)
+    #     print(obj_masks.shape)
+    #     break
 
