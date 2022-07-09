@@ -97,6 +97,7 @@ def main():
         batch_mse_losses = []
         batch_ssim_losses = []
         batch_msgm_losses = []
+        batch_perce_losses = []
         batch_total_losses = []
         for i, data_batch in enumerate(dataloader):
             step += 1
@@ -137,16 +138,19 @@ def main():
             loss_mse_float = loss_dict['mse'].cpu().item()
             loss_ssim_float = loss_dict['ssim'].cpu().item()
             loss_msgm_float = loss_dict['msgm'].cpu().item()
+            loss_perce_loss_float = loss_dict['perce_loss'].cpu().item()
             loss_total_float = total_loss.cpu().detach().item()
 
-            s = 'epoch:%d/step:%d lr:%1.7f loss:%5.5f mse:%.3f ssim:%.3f msgm:%.3f' % (
-                epoch, step, current_lr, loss_total_float, loss_mse_float, loss_ssim_float, loss_msgm_float
+            s = 'epoch:%d/step:%d lr:%1.7f loss:%5.5f mse:%.3f ssim:%.3f msgm:%.3f perce:%.3f' % (
+                epoch, step, current_lr, loss_total_float,
+                loss_mse_float, loss_ssim_float, loss_msgm_float, loss_perce_loss_float
             )
             print(s)
 
             batch_mse_losses.append(loss_mse_float)
             batch_ssim_losses.append(loss_ssim_float)
             batch_msgm_losses.append(loss_msgm_float)
+            batch_perce_losses.append(loss_perce_loss_float)
             batch_total_losses.append(loss_total_float)
 
         rimgs = loss_dict['rimgs'].detach().cpu().numpy()
@@ -164,14 +168,16 @@ def main():
         cur_mse_loss = np.mean(batch_mse_losses)
         cur_ssim_loss = np.mean(batch_ssim_losses)
         cur_msgm_loss = np.mean(batch_msgm_losses)
+        cur_perce_loss = np.mean(batch_perce_losses)
         cur_total_loss = np.mean(batch_total_losses)
         logger.add_scalar('mse_loss', cur_mse_loss, global_step=epoch)
         logger.add_scalar('ssim_loss', cur_ssim_loss, global_step=epoch)
         logger.add_scalar('msgm_loss', cur_msgm_loss, global_step=epoch)
+        logger.add_scalar('perce_loss', cur_perce_loss, global_step=epoch)
         logger.add_scalar('total_loss', cur_total_loss, global_step=epoch)
         logger.add_scalar('lr', current_lr, global_step=epoch)
-        print('###### epoch:%d lr:%1.7f loss:%5.5f mse:%.3f ssim:%.3f msgm:%.3f \n' %
-              (epoch, current_lr, cur_total_loss, cur_mse_loss, cur_ssim_loss, cur_msgm_loss)
+        print('###### epoch:%d lr:%1.7f loss:%5.5f mse:%.3f ssim:%.3f msgm:%.3f perce:%.3f\n' %
+              (epoch, current_lr, cur_total_loss, cur_mse_loss, cur_ssim_loss, cur_msgm_loss, cur_perce_loss)
               )
 
         epoch += 1
