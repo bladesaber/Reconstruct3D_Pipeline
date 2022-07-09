@@ -10,7 +10,7 @@ import numpy as np
 
 from tensorboardX import SummaryWriter
 from models.utils.utils import Best_Saver
-from models.RIAD.model_unet_gan import UNet_Gan, Discriminator
+from models.RIAD.model_unet_gan import UNet_Gan, SN_Discriminator, RestNet_Discriminator
 from models.RIAD.aug_dataset import CustomDataset
 from models.RIAD.model_unet_gan import CustomTrainer
 
@@ -18,23 +18,24 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
 
     parser.add_argument('--experient', type=str, help='',
-                        default='experiment_1')
+                        default='experiment_5')
     parser.add_argument('--save_dir', type=str, help='',
-                        default='/home/quan/Desktop/tempary/output')
+                        default='/home/psdz/HDD/quan/output')
     parser.add_argument('--mask_dir', type=str, help='',
-                        default='/home/quan/Desktop/company/dirty_dataset/RAID/masks')
+                        default='/home/psdz/HDD/quan/RAID/masks')
     parser.add_argument('--img_dir', type=str, help='',
-                        default='/home/quan/Desktop/company/dirty_dataset/RAID/images')
+                        default='/home/psdz/HDD/quan/RAID/images')
 
-    parser.add_argument('--device', type=str, default='cpu')
+    parser.add_argument('--device', type=str, default='cuda')
 
-    parser.add_argument('--lr', type=float, default=0.0001)
+    parser.add_argument('--glr', type=float, default=0.0001)
+    parser.add_argument('--dlr', type=float, default=0.01)
     parser.add_argument('--regularization', type=float, default=0.0005)
-    parser.add_argument('--gen_accumulate', type=int, default=1)
+    parser.add_argument('--gen_accumulate', type=int, default=10000)
     parser.add_argument('--dis_accumulate', type=int, default=1)
     parser.add_argument('--max_epoches', type=int, default=500)
 
-    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--batch_size', type=int, default=3)
     parser.add_argument('--width', type=int, default=640)
     parser.add_argument('--height', type=int, default=480)
 
@@ -61,7 +62,8 @@ def main():
         os.mkdir(vis_dir)
 
     unet = UNet_Gan()
-    discrimator = Discriminator(width=args.width, height=args.height)
+    # discrimator = SN_Discriminator(width=args.width, height=args.height)
+    discrimator = RestNet_Discriminator()
 
     dataset = CustomDataset(
         img_dir=args.img_dir,
@@ -74,8 +76,8 @@ def main():
     )
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
-    unet_opt = torch.optim.Adam(unet.parameters(), lr=args.lr, weight_decay=args.regularization)
-    disc_opt = torch.optim.Adam(discrimator.parameters(), lr=args.lr, weight_decay=args.regularization)
+    unet_opt = torch.optim.Adam(unet.parameters(), lr=args.glr, weight_decay=args.regularization)
+    disc_opt = torch.optim.Adam(discrimator.parameters(), lr=args.dlr, weight_decay=args.regularization)
 
     if device == 'cuda':
         unet = unet.to(torch.device('cuda:0'))
@@ -158,9 +160,11 @@ def main():
             gen_acc_float = gen_acc.cpu().item()
             dis_acc_float = dis_acc.cpu().item()
 
-            s = 'epoch:%d/step:%d gen_loss:%3.3f dis_loss:%3.3f mse:%.3f ssim:%.3f msgm:%.3f advGen_loss:msgm:%.3f '% (
+            s = 'epoch:%d/step:%d gen_loss:%3.3f dis_loss:%3.3f mse:%.3f ssim:%.3f msgm:%.3f advGen_loss:%.3f ' \
+                'dis_acc:%.1f gen_acc:%.1f'% (
                 epoch, step, loss_gen_float, loss_dis_float,
                 loss_mse_float, loss_ssim_float, loss_msgm_float, loss_adv_gen_float,
+                dis_acc_float, gen_acc_float
             )
             print(s)
 
@@ -214,7 +218,7 @@ def main():
         logger.add_scalar('gen_acc', cur_gen_acc, global_step=epoch)
         logger.add_scalar('dis_acc', cur_dis_acc, global_step=epoch)
         print('###### epoch:%d gen_loss:%3.3f dis_loss:%3.3f mse:%.3f ssim:%.3f msgm:%.3f advGen_loss:msgm:%.3f ' \
-                'gen_acc:%.2f dis_acc:%.2f' %
+                'gen_acc:%.2f dis_acc:%.2f \n' %
               (epoch, cur_gen_loss,
                cur_dis_loss, cur_mse_loss, cur_ssim_loss, cur_msgm_loss,
                cur_adv_gen_loss, cur_gen_acc, cur_dis_acc)

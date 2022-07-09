@@ -4,6 +4,7 @@ import torch
 from torch.nn.utils import spectral_norm
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
+from torchvision.models import resnet18, resnet50
 
 from models.RIAD.loss_utils import SSIMLoss, MSGMSLoss
 from torchmetrics.functional import accuracy
@@ -190,9 +191,9 @@ class UNet_Gan(nn.Module):
             'msgm': msgm_loss,
         }, mb_reconst
 
-class Discriminator(nn.Module):
+class SN_Discriminator(nn.Module):
     def __init__(self, width, height):
-        super(Discriminator, self).__init__()
+        super(SN_Discriminator, self).__init__()
         inc = 3
         self.conv = nn.Sequential(
             spectral_norm(nn.Conv2d(inc, 32, 4, stride=2, padding=1, bias=False)),
@@ -219,6 +220,21 @@ class Discriminator(nn.Module):
         out = self.linear(feat)
         return out
 
+class RestNet_Discriminator(nn.Module):
+    def __init__(self):
+        super(RestNet_Discriminator, self).__init__()
+
+        self.backbone = resnet50(pretrained=True)
+        self.backbone.fc = nn.Linear(2048, 32, bias=True)
+        # self.out_relu = nn.ReLU()
+        # self.out_linear = nn.Linear(32, 2, bias=False)
+
+    def forward(self, x):
+        x = self.backbone(x)
+        # x = self.out_relu(x)
+        # x = self.out_linear(x)
+        return x
+
 class CustomTrainer(object):
     def __init__(self):
         self.loss_fn = nn.CrossEntropyLoss()
@@ -233,17 +249,20 @@ class CustomTrainer(object):
         d_fake = net_d(fake_imgs_detach)
         d_real = net_d(real_imgs)
 
-        dis_loss = self.loss_fn(d_fake, torch.ones(batch_size, dtype=torch.long)) + \
-                   self.loss_fn(d_real, torch.zeros(batch_size, dtype=torch.long))
-        gen_loss = self.loss_fn(g_fake, torch.zeros(batch_size, dtype=torch.long))
+        ones_array = torch.ones(batch_size, dtype=torch.long, device=d_fake.device)
+        zeros_array = torch.zeros(batch_size, dtype=torch.long, device=d_fake.device)
+
+        dis_loss = self.loss_fn(d_fake, ones_array) + self.loss_fn(d_real, zeros_array)
+        gen_loss = self.loss_fn(g_fake, zeros_array)
 
         d_fake_softmax = F.softmax(d_fake, dim=1)
         d_real_softmax = F.softmax(d_real, dim=1)
         g_fake_softmax = F.softmax(g_fake, dim=1)
-        dis_fake_acc = accuracy(d_fake_softmax, torch.ones(batch_size, dtype=torch.long))
-        dis_real_acc = accuracy(d_real_softmax, torch.zeros(batch_size, dtype=torch.long))
+
+        dis_fake_acc = accuracy(d_fake_softmax, ones_array)
+        dis_real_acc = accuracy(d_real_softmax, zeros_array)
         dis_acc = (dis_fake_acc + dis_real_acc) / 2.0
-        gen_acc = accuracy(g_fake_softmax, torch.zeros(batch_size, dtype=torch.long))
+        gen_acc = accuracy(g_fake_softmax, zeros_array)
 
         acc_dict = {
             'dis_acc': dis_acc,
@@ -259,5 +278,8 @@ class CustomTrainer(object):
 if __name__ == '__main__':
     from torchsummary import summary
 
-    network = Discriminator(width=640, height=480)
-    summary(network, input_size=(3, 640, 480), batch_size=1)
+    # network = SN_Discriminator(width=640, height=480)
+    # summary(network, input_size=(3, 640, 480), batch_size=1)
+
+    m = RestNet_Discriminator()
+    summary(m, input_size=(3, 640, 480), batch_size=1)
