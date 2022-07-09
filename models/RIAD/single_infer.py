@@ -9,19 +9,19 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import datetime
 
-from models.RIAD.model import UNet
+from models.RIAD.model_unet import UNet
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
 
     parser.add_argument('--weight', type=str, help='',
-                        default='/home/psdz/HDD/quan/output/experiment_1/checkpoints/model_last.pth')
+                        default='/home/psdz/HDD/quan/output/experiment_4/checkpoints/model_last.pth')
     parser.add_argument('--device', type=str, default='cuda')
 
     parser.add_argument('--mask_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/car3/car2')
+                        default='/home/psdz/HDD/quan/output/test/mask')
     parser.add_argument('--img_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/car3/CAR_TEST')
+                        default='/home/psdz/HDD/quan/output/test/img')
     parser.add_argument('--save_dir', type=str,
                         default='/home/psdz/HDD/quan/output/test/result')
     parser.add_argument('--width', type=int, default=640)
@@ -124,6 +124,13 @@ def main_with_mask():
 
     network = UNet()
     weight = torch.load(args.weight)['state_dict']
+
+    load_weight = {}
+    for key in weight:
+        if 'perceptual_loss_fn' not in key:
+            load_weight[key] = weight[key]
+    weight = load_weight
+
     network.load_state_dict(weight)
     if device == 'cuda':
         network = network.to(torch.device('cuda:0'))
@@ -193,5 +200,82 @@ def main_with_mask():
                     os.path.join(name_dir, 'cut_%d.jpg' % cutout_size), rimg
                 )
 
+def single_test(img_path, mask_path, run_count):
+    args = parse_args()
+
+    device = args.device
+
+    network = UNet()
+    weight = torch.load(args.weight)['state_dict']
+
+    load_weight = {}
+    for key in weight:
+        if 'perceptual_loss_fn' not in key:
+            load_weight[key] = weight[key]
+    weight = load_weight
+
+    network.load_state_dict(weight)
+    if device == 'cuda':
+        network = network.to(torch.device('cuda:0'))
+    network.eval()
+
+    img = cv2.imread(img_path)
+    mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
+    if mask.ndim == 3:
+        mask = mask[:, :, 0]
+
+    orig_img = img.copy()
+    orig_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB)
+    h, w, c = img.shape
+
+    cutout_size = 2
+
+    for count_id in range(run_count):
+        img_r, mask_r = post_process(img, mask)
+        img_r = cv2.resize(img_r, (args.width, args.height))
+        mask_r = cv2.resize(mask_r, (args.width, args.height))
+
+        _, disjoint_masks, disjoint_imgs = parse_img(
+            img=img_r, mask=mask_r,
+            cutout_size=cutout_size, num_disjoint_masks=3,
+            with_normalize=True, channel_first=True
+        )
+
+        disjoint_imgs = disjoint_imgs[np.newaxis, ...]
+        disjoint_masks = disjoint_masks[np.newaxis, ...]
+        disjoint_masks = torch.from_numpy(disjoint_masks)
+        disjoint_imgs = torch.from_numpy(disjoint_imgs)
+        if device == 'cuda':
+            disjoint_masks = disjoint_masks.to(torch.device('cuda:0'))
+            disjoint_imgs = disjoint_imgs.to(torch.device('cuda:0'))
+
+            rimg = network.infer(disjoint_masks=disjoint_masks, mask_imgs=disjoint_imgs)
+            rimg = rimg.detach().cpu().numpy()[0, ...]
+            rimg = np.transpose(rimg, (1, 2, 0))
+            rimg = (rimg * 255.).astype(np.uint8)
+
+            cv2.imwrite(
+                os.path.join('/home/psdz/HDD/quan/output/test/ttt',
+                             'cut%d_count%d.jpg' % (cutout_size, count_id)),
+                rimg
+            )
+
+            img = rimg
+
+            # plt.figure('o')
+            # plt.imshow(orig_img)
+            # plt.figure('r')
+            # simg = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # plt.imshow(simg)
+            # plt.show()
+
+            img = cv2.resize(img, (w, h))
+
 if __name__ == '__main__':
-    main_with_mask()
+    # main_with_mask()
+
+    single_test(
+        img_path='/home/psdz/HDD/quan/output/test/img/11.jpg',
+        mask_path='/home/psdz/HDD/quan/output/test/mask/11.jpg',
+        run_count=10
+    )

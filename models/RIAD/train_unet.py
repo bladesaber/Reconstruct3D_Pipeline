@@ -10,7 +10,7 @@ import numpy as np
 
 from tensorboardX import SummaryWriter
 from models.RIAD.aug_dataset import CustomDataset
-from models.RIAD.model import UNet
+from models.RIAD.model_unet import UNet
 from models.utils.utils import Best_Saver
 
 def parse_args():
@@ -121,9 +121,9 @@ def main():
                 optimizer.step()
                 optimizer.zero_grad()
 
-            loss_mse_float = loss_dict['mse'].cpu().item()
-            loss_ssim_float = loss_dict['ssim'].cpu().item()
-            loss_msgm_float = loss_dict['msgm'].cpu().item()
+            loss_mse_float = loss_dict['mse'].cpu().detach().item()
+            loss_ssim_float = loss_dict['ssim'].cpu().detach().item()
+            loss_msgm_float = loss_dict['msgm'].cpu().detach().item()
             loss_total_float = total_loss.cpu().detach().item()
 
             s = 'epoch:%d/step:%d lr:%1.7f loss:%5.5f mse:%.3f ssim:%.3f msgm:%.3f' % (
@@ -152,6 +152,12 @@ def main():
         cur_ssim_loss = np.mean(batch_ssim_losses)
         cur_msgm_loss = np.mean(batch_msgm_losses)
         cur_total_loss = np.mean(batch_total_losses)
+
+        batch_mse_losses.clear()
+        batch_ssim_losses.clear()
+        batch_msgm_losses.clear()
+        batch_total_losses.clear()
+
         logger.add_scalar('mse_loss', cur_mse_loss, global_step=epoch)
         logger.add_scalar('ssim_loss', cur_ssim_loss, global_step=epoch)
         logger.add_scalar('msgm_loss', cur_msgm_loss, global_step=epoch)
