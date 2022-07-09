@@ -202,41 +202,142 @@ class CustomDataset(Dataset):
 
         return rgb_img, mask
 
+class PerceptionDataset(CustomDataset):
+    def __init__(
+            self,
+            img_dir, mask_dir,
+            num_disjoint_masks=3, cutout_sizes=(2, 4, 8),
+            with_normalize=True, with_aug=False,
+            width=640, height=480, channel_first=True,
+    ):
+        super(PerceptionDataset, self).__init__(
+            img_dir=img_dir, mask_dir=mask_dir, num_disjoint_masks=num_disjoint_masks,
+            cutout_sizes=cutout_sizes, with_normalize=with_normalize,
+            with_aug=with_aug, width=width, height=height, channel_first=channel_first
+        )
+
+    def __getitem__(self, index):
+        index = index % self.num
+
+        path = self.paths[index]
+        img_path = os.path.join(self.img_dir, path)
+        obj_mask_path = os.path.join(self.mask_dir, path)
+
+        img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        obj_multi_mask = cv2.imread(obj_mask_path, cv2.IMREAD_UNCHANGED)
+        img, _ = self.post_process(img, obj_multi_mask)
+
+        obj_mask = np.zeros(obj_multi_mask.shape)
+        obj_mask[np.bitwise_and(obj_multi_mask>100, obj_multi_mask<128)] = 1
+
+        img = cv2.resize(img, (self.img_width, self.img_height))
+        obj_mask = cv2.resize(obj_mask, (self.img_width, self.img_height))
+        obj_mask[obj_mask>=0.5] = 1.0
+        obj_mask[obj_mask<1] = 0.0
+        layer1_mask, layer2_mask, layer3_mask = self.create_layer_masks(obj_mask=obj_mask)
+
+        h, w, c = img.shape
+        cutout_size = random.choice(self.cutout_sizes)
+        disjoint_masks = self.create_disjoint_masks(
+            (h, w),
+            cutout_size=cutout_size,
+            num_disjoint_masks=self.num_disjoint_masks
+        )
+
+        r_img = img.copy()
+        if random.uniform(0.0, 1.0)>0.3:
+            n_points = random.choice(self.n_points_list)
+            r_img = self.draw_random_line(r_img, n_points=n_points)
+            # if random.uniform(0.0, 1.0)>0.5:
+            #     r_img = self.draw_random_line(r_img, n_points=n_points)
+            # else:
+            #     r_img = self.draw_random_circle(r_img, n_points=n_points)
+
+        if self.with_aug:
+            transformed = self.transformer_albu(image=r_img)
+            r_img = transformed["image"]
+
+        disjoint_imgs = []
+        # random_color = np.random.randint(0, 255, (3,))
+        fill_color = np.array([0, 0, 0])
+        for disjoint_id in range(self.num_disjoint_masks):
+            disjoint_mask = disjoint_masks[disjoint_id, :, :]
+            disjoint_img = r_img * disjoint_mask[..., np.newaxis]
+            # disjoint_img[obj_mask == 0, :] = random_color
+            disjoint_img[obj_mask == 0, :] = fill_color
+
+            disjoint_mask[obj_mask == 0] = 1
+            disjoint_masks[disjoint_id, :, :] = disjoint_mask
+
+            disjoint_imgs.append(disjoint_img)
+        disjoint_imgs = np.array(disjoint_imgs)
+
+        if self.channel_first:
+            img = np.transpose(img, (2, 0, 1))
+            disjoint_imgs = np.transpose(disjoint_imgs, (0, 3, 1, 2))
+            obj_mask = obj_mask[np.newaxis, ...]
+            layer1_mask = layer1_mask[np.newaxis, ...]
+            layer2_mask = layer2_mask[np.newaxis, ...]
+            layer3_mask = layer3_mask[np.newaxis, ...]
+
+        if self.with_normalize:
+            img = img / 255.
+            disjoint_imgs = disjoint_imgs / 255.
+
+        return {
+            'img': img.astype(np.float32),
+            'disjoint_masks': disjoint_masks.astype(np.float32),
+            'disjoint_imgs': disjoint_imgs.astype(np.float32),
+            'mask': obj_mask.astype(np.float32),
+            'layer1_mask': layer1_mask.astype(np.float32),
+            'layer2_mask': layer2_mask.astype(np.float32),
+            'layer3_mask': layer3_mask.astype(np.float32),
+        }
+
+    def create_layer_masks(self, obj_mask):
+        h, w = obj_mask.shape
+        layer1_mask = cv2.resize(obj_mask, (int(w/4), int(h/4)))
+        layer1_mask[layer1_mask>=0.5] = 1.0
+        layer1_mask[layer1_mask<1.0] = 0.0
+
+        layer2_mask = cv2.resize(obj_mask, (int(w/8), int(h/8)))
+        layer2_mask[layer2_mask >= 0.5] = 1.0
+        layer2_mask[layer2_mask < 1.0] = 0.0
+
+        layer3_mask = cv2.resize(obj_mask, (int(w/16), int(h/16)))
+        layer3_mask[layer3_mask >= 0.5] = 1.0
+        layer3_mask[layer3_mask < 1.0] = 0.0
+
+        return layer1_mask, layer2_mask, layer3_mask
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    dataset = CustomDataset(
-        img_dir='/home/quan/Desktop/company/dirty_dataset/RAID/images',
-        mask_dir='/home/quan/Desktop/company/dirty_dataset/RAID/masks',
-        num_disjoint_masks=4, channel_first=False, with_aug=True, with_normalize=True
-    )
-
-    # img = cv2.imread('/home/quan/Desktop/company/dirty_dataset/RAID/images/20220706_170502_5.jpg')
-    # img = cv2.resize(img, (640, 480))
-    # img = dataset.draw_random_line(img, n_points=5)
-    # # img = dataset.draw_random_circle(img, n_points=5)
-    # cv2.imshow('d', img)
-    # cv2.waitKey(0)
-
-    for img, masks, mask_imgs, obj_mask in dataset:
-
-        for mimg_id in range(mask_imgs.shape[0]):
-            mimg = mask_imgs[mimg_id, ...]
-            mask = masks[mimg_id, ...]
-
-            plt.figure('rgb')
-            plt.imshow(img)
-            plt.figure('%d_img'%mimg_id)
-            plt.imshow(mimg)
-            plt.figure('%d_mask' % mimg_id)
-            plt.imshow(mask)
-            plt.figure('obj_mask')
-            plt.imshow(obj_mask)
-
-            plt.show()
-
-    # from torch.utils.data import DataLoader
+    # dataset = CustomDataset(
+    #     img_dir='/home/quan/Desktop/company/dirty_dataset/RAID/images',
+    #     mask_dir='/home/quan/Desktop/company/dirty_dataset/RAID/masks',
+    #     num_disjoint_masks=4, channel_first=False, with_aug=True, with_normalize=True
+    # )
+    # for img, masks, mask_imgs, obj_mask in dataset:
     #
+    #     for mimg_id in range(mask_imgs.shape[0]):
+    #         mimg = mask_imgs[mimg_id, ...]
+    #         mask = masks[mimg_id, ...]
+    #
+    #         plt.figure('rgb')
+    #         plt.imshow(img)
+    #         plt.figure('%d_img'%mimg_id)
+    #         plt.imshow(mimg)
+    #         plt.figure('%d_mask' % mimg_id)
+    #         plt.imshow(mask)
+    #         plt.figure('obj_mask')
+    #         plt.imshow(obj_mask)
+    #
+    #         plt.show()
+    #
+    # from torch.utils.data import DataLoader
     # dataset = CustomDataset(
     #     img_dir='/home/quan/Desktop/company/dirty_dataset/RAID/images',
     #     mask_dir='/home/quan/Desktop/company/dirty_dataset/RAID/masks',
@@ -250,3 +351,57 @@ if __name__ == '__main__':
     #     print(obj_masks.shape)
     #     break
 
+    ### -------------------------------------------------
+    dataset = PerceptionDataset(
+        img_dir='/home/quan/Desktop/company/dirty_dataset/RAID/images',
+        mask_dir='/home/quan/Desktop/company/dirty_dataset/RAID/masks',
+        num_disjoint_masks=3, channel_first=False, with_aug=True, with_normalize=True
+    )
+    # for batch_cell in dataset:
+    #     img = batch_cell['img']
+    #     disjoint_masks = batch_cell['disjoint_masks']
+    #     disjoint_imgs = batch_cell['disjoint_imgs']
+    #     mask = batch_cell['mask']
+    #     l1_mask = batch_cell['layer1_mask']
+    #     l2_mask = batch_cell['layer2_mask']
+    #     l3_mask = batch_cell['layer3_mask']
+    #
+    #     for mimg_id in range(disjoint_imgs.shape[0]):
+    #         mimg = disjoint_imgs[mimg_id, ...]
+    #         single_mask = disjoint_masks[mimg_id, ...]
+    #
+    #         plt.figure('rgb')
+    #         plt.imshow(img)
+    #         plt.figure('%d_img'%mimg_id)
+    #         plt.imshow(mimg)
+    #         plt.figure('%d_mask' % mimg_id)
+    #         plt.imshow(single_mask)
+    #         plt.figure('obj_mask')
+    #         plt.imshow(mask)
+    #         plt.figure('l1_mask')
+    #         plt.imshow(l1_mask)
+    #         plt.figure('l2_mask')
+    #         plt.imshow(l2_mask)
+    #         plt.figure('l3_mask')
+    #         plt.imshow(l3_mask)
+    #         plt.show()
+
+    from torch.utils.data import DataLoader
+    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+    for batch_cell in dataloader:
+        img = batch_cell['img']
+        disjoint_masks = batch_cell['disjoint_masks']
+        disjoint_imgs = batch_cell['disjoint_imgs']
+        mask = batch_cell['mask']
+        l1_mask = batch_cell['layer1_mask']
+        l2_mask = batch_cell['layer2_mask']
+        l3_mask = batch_cell['layer3_mask']
+
+        print(img.shape)
+        print(disjoint_masks.shape)
+        print(disjoint_imgs.shape)
+        print(mask.shape)
+        print(l1_mask.shape)
+        print(l2_mask.shape)
+        print(l3_mask.shape)
+        break

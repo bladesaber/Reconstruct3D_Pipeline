@@ -3,6 +3,9 @@ import torch.nn.functional as F
 from torch import Tensor
 import torch.nn as nn
 from typing import Tuple
+from torchvision.models.resnet import resnet18, resnet50
+from torchvision.models.feature_extraction import get_graph_node_names
+from torchvision.models.feature_extraction import create_feature_extractor
 
 class SSIMLoss(nn.Module):
     def __init__(self, kernel_size: int = 11, sigma: float = 1.5) -> None:
@@ -108,3 +111,66 @@ class MSGMSLoss(nn.Module):
         prewitt_y = torch.Tensor([[[[1, 1, 1], [0, 0, 0], [-1, -1, -1]]]]) / 3.0  # (1, 1, 3, 3)
         prewitt_y = prewitt_y.repeat(self.in_channels, 1, 1, 1)  # (self.in_channels, 1, 3, 3)
         return (prewitt_x, prewitt_y)
+
+class Resnet_Perceptual(nn.Module):
+    def __init__(self,
+                 weights={'layer1': 0.4, 'layer2': 0.35, 'layer3': 0.25},
+                 device='cpu'
+                 ):
+        super(Resnet_Perceptual, self).__init__()
+
+        # self.resnet = resnet50(pretrained=True)
+        # train_nodes, eval_nodes = get_graph_node_names(self.resnet)
+        self.resnet_return_nodes = {
+            'layer1': 'layer1',
+            'layer2': 'layer2',
+            'layer3': 'layer3',
+            # 'layer4': 'layer4',
+        }
+        self.resnet = create_feature_extractor(
+            model=resnet50(pretrained=True),
+            return_nodes=self.resnet_return_nodes
+        )
+        if device == 'cuda':
+            self.resnet.to(torch.device('cuda:0'))
+
+        self.weights = weights
+        self.init_weight()
+
+    def __call__(self, orig_img, reconst_img, layer_masks):
+        orig_rdict = self.resnet(orig_img)
+        reconst_rdict = self.resnet(reconst_img)
+
+        content_loss = 0.0
+        for key in orig_rdict.keys():
+            orig_map = orig_rdict[key]
+            reconst_map = reconst_rdict[key]
+            layer_mask = layer_masks[key]
+
+            # print(orig_map.shape, layer_mask.shape)
+            assert orig_map.shape[-2:] == reconst_map.shape[-2:]
+
+            loss = (orig_map - reconst_map).abs()
+            loss = loss * layer_mask
+
+            loss = loss.sum() / layer_mask.sum()
+            content_loss += loss
+
+        content_loss = content_loss / float(len(layer_masks))
+
+        return content_loss
+
+    def init_weight(self):
+        for name, param in self.named_parameters():
+            param.requires_grad = False
+
+if __name__ == '__main__':
+    # loss_fn = MSGMSLoss()
+    # loss_fn = SSIMLoss()
+    # loss_fn = Resnet_Perceptual()
+    #
+    # print(len(list(loss_fn.named_parameters())))
+    # for name, param in loss_fn.named_parameters():
+    #     print(name, param.requires_grad)
+
+    pass
