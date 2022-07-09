@@ -47,6 +47,7 @@ def parse_args():
 
 def main():
     args = parse_args()
+    device = args.device
 
     save_dir = os.path.join(args.save_dir, args.experient)
     if not os.path.exists(save_dir):
@@ -59,7 +60,7 @@ def main():
     if not os.path.exists(vis_dir):
         os.mkdir(vis_dir)
 
-    network = UNet_perception()
+    network = UNet_perception(device=device)
     dataset = PerceptionDataset(
         img_dir=args.img_dir,
         mask_dir=args.mask_dir,
@@ -67,7 +68,7 @@ def main():
         with_aug=False,
         with_normalize=True,
         width=args.width, height=args.height,
-        cutout_sizes=(2, 4), num_disjoint_masks=3
+        cutout_sizes=(2, 4), num_disjoint_masks=3,
     )
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
@@ -77,7 +78,6 @@ def main():
         verbose=True, cooldown=0
     )
 
-    device = args.device
     if device == 'cuda':
         network = network.to(torch.device('cuda:0'))
 
