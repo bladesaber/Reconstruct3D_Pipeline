@@ -149,14 +149,15 @@ class Resnet_Perceptual(nn.Module):
 
             # print(orig_map.shape, layer_mask.shape)
             assert orig_map.shape[-2:] == reconst_map.shape[-2:]
+            c_num = orig_map.shape[1]
 
             loss = (orig_map - reconst_map).abs()
             loss = loss * layer_mask
 
-            loss = loss.sum() / layer_mask.sum()
+            loss = loss.sum() / layer_mask.sum() / c_num
             content_loss += loss
 
-        content_loss = content_loss / float(len(layer_masks))
+        # content_loss = content_loss / float(len(layer_masks))
 
         return content_loss
 

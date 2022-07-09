@@ -320,7 +320,7 @@ class UNet_perception(nn.Module):
         }
         perce_loss = self.perceptual_loss_fn(orig_img=imgs, reconst_img=mb_reconst, layer_masks=layer_mask_dict)
 
-        total_loss = mse_loss + ssim_loss + msgm_loss + perce_loss
+        total_loss = mse_loss + ssim_loss + msgm_loss + perce_loss * 3.0
 
         return {
             'mse': mse_loss,
