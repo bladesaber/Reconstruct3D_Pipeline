@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import torch.nn as nn
 import torch
@@ -5,6 +7,7 @@ from torch.nn.utils import spectral_norm
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from torchvision.models import resnet18, resnet50
+from torchvision.models.feature_extraction import create_feature_extractor
 
 from models.RIAD.loss_utils import SSIMLoss, MSGMSLoss
 from torchmetrics.functional import accuracy
@@ -113,20 +116,20 @@ class UNet_Gan(nn.Module):
         self.merge_mode = merge_mode
         self.up_mode = up_mode
 
-        self.down1 = UNetDownBlock(self.n_chnnels, 64, 3, 1, 1)
-        self.down2 = UNetDownBlock(64, 128, 4, 2, 1)
-        self.down3 = UNetDownBlock(128, 256, 4, 2, 1)
-        self.down4 = UNetDownBlock(256, 512, 4, 2, 1)
-        self.down5 = UNetDownBlock(512, 512, 4, 2, 1)
+        self.down1 = UNetDownBlock(self.n_chnnels, 32, 3, 1, 1)
+        self.down2 = UNetDownBlock(32, 64, 4, 2, 1)
+        self.down3 = UNetDownBlock(64, 128, 4, 2, 1)
+        self.down4 = UNetDownBlock(128, 196, 4, 2, 1)
+        self.down5 = UNetDownBlock(196, 256, 4, 2, 1)
 
-        self.up1 = UNetUpBlock(512, 512, merge_mode=self.merge_mode, up_mode=self.up_mode)
-        self.up2 = UNetUpBlock(512, 256, merge_mode=self.merge_mode, up_mode=self.up_mode)
-        self.up3 = UNetUpBlock(256, 128, merge_mode=self.merge_mode, up_mode=self.up_mode)
-        self.up4 = UNetUpBlock(128, 64, merge_mode=self.merge_mode, up_mode=self.up_mode)
+        self.up1 = UNetUpBlock(256, 196, merge_mode=self.merge_mode, up_mode=self.up_mode)
+        self.up2 = UNetUpBlock(196, 128, merge_mode=self.merge_mode, up_mode=self.up_mode)
+        self.up3 = UNetUpBlock(128, 64, merge_mode=self.merge_mode, up_mode=self.up_mode)
+        self.up4 = UNetUpBlock(64, 32, merge_mode=self.merge_mode, up_mode=self.up_mode)
 
         self.conv_final = nn.Sequential(
             nn.Conv2d(
-                in_channels=64, out_channels=3,
+                in_channels=32, out_channels=3,
                 kernel_size=3, stride=1, padding=1
             ),
             nn.Tanh()
@@ -184,11 +187,13 @@ class UNet_Gan(nn.Module):
 
         ssim_loss = self.ssim_loss_fn(mb_reconst, imgs, as_loss=True)
         msgm_loss = self.msgm_loss_fn(mb_reconst, imgs, as_loss=True)
+        total_loss = mse_loss + ssim_loss + msgm_loss
 
         return {
             'mse': mse_loss,
             'ssim': ssim_loss,
             'msgm': msgm_loss,
+            'total': total_loss,
         }, mb_reconst
 
 class SN_Discriminator(nn.Module):
@@ -224,27 +229,80 @@ class RestNet_Discriminator(nn.Module):
     def __init__(self):
         super(RestNet_Discriminator, self).__init__()
 
-        self.backbone = resnet50(pretrained=True)
-        self.backbone.fc = nn.Linear(2048, 32, bias=True)
-        # self.out_relu = nn.ReLU()
-        # self.out_linear = nn.Linear(32, 2, bias=False)
+        # self.backbone = resnet50(pretrained=True)
+        # self.backbone.fc = nn.Linear(2048, 32, bias=True)
+        self.backbone = resnet18(pretrained=True)
+        self.backbone.fc = nn.Linear(512, 32, bias=True)
+
+        self.out_relu = nn.ReLU()
+        self.out_linear = nn.Linear(32, 2, bias=False)
 
     def forward(self, x):
         x = self.backbone(x)
-        # x = self.out_relu(x)
-        # x = self.out_linear(x)
+        x = self.out_relu(x)
+        x = self.out_linear(x)
         return x
 
-class CustomTrainer(object):
+class Res_Discriminator(nn.Module):
+    def __init__(self, num_classes, selfTrain=False):
+        super(Res_Discriminator, self).__init__()
+
+        self.resnet_return_nodes = {
+            'layer4': 'layer4',
+        }
+        self.backone = create_feature_extractor(
+            model=resnet18(pretrained=True),
+            return_nodes=self.resnet_return_nodes
+        )
+
+        self.final_conv = nn.Conv2d(in_channels=512, out_channels=128, kernel_size=(15, 20), stride=1, padding=0)
+        self.flattern = nn.Flatten()
+        self.linear1 = nn.Linear(128, 32, bias=True)
+        self.linear2 = nn.Linear(32, num_classes, bias=False)
+
+        self.init_weight()
+
+        if selfTrain:
+            self.loss_fn = nn.CrossEntropyLoss()
+
+    def init_weight(self):
+        for name, param in self.backone.named_parameters():
+            param.requires_grad = False
+
+        torch.nn.init.normal_(self.final_conv.weight, std=0.01)
+        torch.nn.init.constant_(self.final_conv.bias, 0.0)
+
+        torch.nn.init.constant_(self.linear1.bias, 0.0)
+        torch.nn.init.normal_(self.linear1.weight, std=0.01)
+        torch.nn.init.normal_(self.linear2.weight, std=0.01)
+
+    def forward(self, x):
+        x_dict = self.backone(x)
+        x = x_dict['layer4']
+        x = self.final_conv(x)
+        x = self.flattern(x)
+        x = self.linear1(x)
+        x = F.relu(x)
+        x = self.linear2(x)
+
+        return x
+
+    def train_step(self, x, labels):
+        x = self.forward(x)
+        loss = self.loss_fn(x, labels)
+
+        out = F.softmax(x, dim=1)
+        acc = accuracy(out, labels)
+
+        return loss, acc
+
+class Adv_BCELoss_Trainer(object):
     def __init__(self):
         self.loss_fn = nn.CrossEntropyLoss()
 
-    def train(self, net_d, real_imgs, fake_imgs):
+    def discrimator_loss(self, net_d, real_imgs, fake_imgs):
         batch_size = real_imgs.shape[0]
-
         fake_imgs_detach = fake_imgs.detach()
-
-        g_fake = net_d(fake_imgs)
 
         d_fake = net_d(fake_imgs_detach)
         d_real = net_d(real_imgs)
@@ -253,33 +311,89 @@ class CustomTrainer(object):
         zeros_array = torch.zeros(batch_size, dtype=torch.long, device=d_fake.device)
 
         dis_loss = self.loss_fn(d_fake, ones_array) + self.loss_fn(d_real, zeros_array)
-        gen_loss = self.loss_fn(g_fake, zeros_array)
 
         d_fake_softmax = F.softmax(d_fake, dim=1)
         d_real_softmax = F.softmax(d_real, dim=1)
-        g_fake_softmax = F.softmax(g_fake, dim=1)
-
         dis_fake_acc = accuracy(d_fake_softmax, ones_array)
         dis_real_acc = accuracy(d_real_softmax, zeros_array)
         dis_acc = (dis_fake_acc + dis_real_acc) / 2.0
+
+        return dis_loss.mean(), dis_acc
+
+    def generator_loss(self, net_d, fake_imgs):
+        batch_size = fake_imgs.shape[0]
+
+        zeros_array = torch.zeros(batch_size, dtype=torch.long, device=fake_imgs.device)
+
+        g_fake = net_d(fake_imgs)
+        gen_loss = self.loss_fn(g_fake, zeros_array)
+
+        g_fake_softmax = F.softmax(g_fake, dim=1)
         gen_acc = accuracy(g_fake_softmax, zeros_array)
 
-        acc_dict = {
-            'dis_acc': dis_acc,
-            'gen_acc': gen_acc,
-        }
-        loss_dict = {
-            'dis_loss': dis_loss.mean(),
-            'gen_loss': gen_loss.mean(),
-        }
+        return gen_loss.mean(), gen_acc
+
+    def train(self, net_d, real_imgs, fake_imgs, with_gen_loss=True):
+        loss_dict = {}
+        acc_dict = {}
+
+        dis_loss, dis_acc = self.discrimator_loss(
+            net_d=net_d, real_imgs=real_imgs, fake_imgs=fake_imgs
+        )
+        loss_dict.update({'dis_loss': dis_loss})
+        acc_dict.update({'dis_acc': dis_acc})
+
+        if with_gen_loss:
+            gen_loss, gen_acc = self.generator_loss(net_d=net_d, fake_imgs=fake_imgs)
+            loss_dict.update({'gen_loss': gen_loss})
+            acc_dict.update({'gen_acc': gen_acc})
 
         return loss_dict, acc_dict
 
 if __name__ == '__main__':
     from torchsummary import summary
+    import cv2
+    from tqdm import tqdm
 
-    # network = SN_Discriminator(width=640, height=480)
-    # summary(network, input_size=(3, 640, 480), batch_size=1)
+    # m = SN_Discriminator(width=640, height=480)
+    # m = RestNet_Discriminator()
+    # m = UNet_Gan()
+    # m = Res_Discriminator()
+    # m = CNN_Discriminator()
 
-    m = RestNet_Discriminator()
-    summary(m, input_size=(3, 640, 480), batch_size=1)
+    # m = m.cuda()
+    # summary(m, input_size=(3, 640, 480), batch_size=1)
+
+    # pos_res, neg_res = 0, 0
+    # dir = '/home/quan/Desktop/company/vis'
+    # # m = Res_Discriminator()
+    # # for path in tqdm(os.listdir(dir)):
+    # for path in tqdm(range(200)):
+    #     # apath = os.path.join(dir, path)
+    #     # img = cv2.imread(apath)
+    #     # img = img.astype(np.float32)
+    #     # img = img / 255.
+    #     # img = np.transpose(img, (2, 0, 1))
+    #     # img = img[np.newaxis, ...]
+    #     # img = torch.from_numpy(img)
+    #
+    #     # img = np.random.randint(0, 255, (640, 480, 3))
+    #     img = np.random.random((640, 480, 3))
+    #     # plt.imshow(img)
+    #     # plt.show()
+    #     img = np.transpose(img, (2, 0, 1))[np.newaxis, ...]
+    #     img = img.astype(np.float32)
+    #     img = torch.from_numpy(img)
+    #
+    #     result = m(img)
+    #     res = (result.detach().cpu().numpy())[0, ...]
+    #     print(res)
+    #     if res[0]>res[1]:
+    #         pos_res += 1
+    #     else:
+    #         neg_res += 1
+    #
+    # print(pos_res)
+    # print(neg_res)
+    #
+    # pass

@@ -27,3 +27,25 @@ class Logger_Visdom(object):
     def log_img(self, image, name):
         image = np.transpose(image, (2, 0, 1))
         self.vis.image(image, win=name)
+
+class Metric_Recorder(object):
+    def __init__(self):
+        self.record_dict = {}
+
+    def add_scalar_tensor(self, name, scalar):
+        scalar_float = scalar.cpu().detach().item()
+
+        if name not in self.record_dict.keys():
+            self.record_dict[name] = []
+        self.record_dict[name].append(scalar_float)
+        return scalar_float
+
+    def clear(self):
+        for name in self.record_dict.keys():
+            self.record_dict[name].clear()
+
+    def compute_mean(self):
+        result = {}
+        for name in self.record_dict.keys():
+            result[name] = np.mean(self.record_dict[name])
+        return result
