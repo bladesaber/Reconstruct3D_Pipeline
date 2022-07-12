@@ -287,6 +287,17 @@ class Res_Discriminator(nn.Module):
 
         return x
 
+    def infer(self, x):
+        x_dict = self.backone(x)
+        x = x_dict['layer4']
+        x = self.final_conv(x)
+        x = self.flattern(x)
+        x = self.linear1(x)
+        x = F.relu(x)
+        x = self.linear2(x)
+        out = F.softmax(x, dim=1)
+        return out
+
     def train_step(self, x, labels):
         x = self.forward(x)
         loss = self.loss_fn(x, labels)
@@ -318,7 +329,7 @@ class Adv_BCELoss_Trainer(object):
         dis_real_acc = accuracy(d_real_softmax, zeros_array)
         dis_acc = (dis_fake_acc + dis_real_acc) / 2.0
 
-        return dis_loss.mean(), dis_acc
+        return dis_loss, dis_acc
 
     def generator_loss(self, net_d, fake_imgs):
         batch_size = fake_imgs.shape[0]

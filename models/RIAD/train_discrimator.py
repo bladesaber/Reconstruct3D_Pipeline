@@ -1,6 +1,6 @@
 import argparse
 import os
-
+import matplotlib.pyplot as plt
 import cv2
 from torch.utils.data import DataLoader
 import torch
@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--save_dir', type=str, help='',
                         default='/home/psdz/HDD/quan/output')
     parser.add_argument('--data_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/flower_dataset')
+                        default='/home/psdz/HDD/quan/temp_trash/fakeVSreal')
 
     parser.add_argument('--device', type=str, default='cuda')
 
@@ -40,6 +40,9 @@ def parse_args():
     parser.add_argument('--checkpoint_interval', type=int, default=1)
     parser.add_argument('--minimum_lr', type=float, default=1e-4)
 
+    parser.add_argument('--resume_weight', type=str,
+                        default='/home/psdz/HDD/quan/output/dis2/checkpoints/model_dis.pth')
+
     args = parser.parse_args()
     return args
 
@@ -56,7 +59,7 @@ def train():
 
     logger = SummaryWriter(log_dir=save_dir)
 
-    network = Res_Discriminator(num_classes=5, selfTrain=True)
+    network = Res_Discriminator(num_classes=2, selfTrain=True)
 
     dataset = Dir_Dataset(
         dir=args.data_dir,
@@ -72,7 +75,7 @@ def train():
 
     time_tag = (datetime.datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
     saver = Best_Saver(
-        path=os.path.join(save_dir, 'checkpoints', "model_unet.pth"),
+        path=os.path.join(save_dir, 'checkpoints', "model_dis.pth"),
         meta=time_tag
     )
 
@@ -137,5 +140,47 @@ def train():
         if epoch > args.max_epoches:
             break
 
+def infer():
+    args = parse_args()
+
+    device = args.device
+
+    network = Res_Discriminator(num_classes=5, selfTrain=True)
+    weight = torch.load(args.resume_weight)['state_dict']
+    network.load_state_dict(weight)
+    network.eval()
+
+    dataset = Dir_Dataset(
+        dir=args.data_dir,
+        channel_first=True,
+        width=args.width, height=args.height,
+    )
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+
+    if device == 'cuda':
+        network = network.to(torch.device('cuda:0'))
+
+    for i, data_batch in enumerate(dataloader):
+
+        batch_imgs, batch_label_ids, batch_labels = data_batch
+        if device == 'cuda':
+            batch_imgs = batch_imgs.to(torch.device('cuda:0'))
+            batch_label_ids = batch_label_ids.to(torch.device('cuda:0'))
+            # batch_labels = batch_labels.to(torch.device('cuda:0'))
+
+        results = network.infer(x=batch_imgs)
+        for idx in range(batch_label_ids.shape[0]):
+            img = batch_imgs[idx, ...].detach().cpu().numpy()
+            img = np.transpose(img, (1, 2, 0))
+
+            res = results[idx, ...].cpu().detach().numpy()
+            pred_id = np.argmax(res)
+
+            print('pred id: ', pred_id, res)
+            print('Label: ', batch_label_ids[idx].cpu().item(), batch_labels[idx])
+            plt.imshow(img)
+            plt.show()
+
 if __name__ == '__main__':
-    train()
+    # train()
+    infer()

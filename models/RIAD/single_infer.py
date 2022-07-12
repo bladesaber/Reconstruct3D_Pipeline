@@ -140,7 +140,7 @@ def main_with_mask():
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
 
-    cutout_sizes = (2, 4, 8)
+    cutout_sizes = (2, 4)
     for path in tqdm(os.listdir(args.img_dir)):
         img_path = os.path.join(args.img_dir, path)
         mask_path = os.path.join(args.mask_dir, path)
