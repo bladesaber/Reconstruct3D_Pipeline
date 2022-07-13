@@ -41,7 +41,7 @@ def parse_args():
     parser.add_argument('--minimum_lr', type=float, default=1e-4)
 
     parser.add_argument('--resume_weight', type=str,
-                        default='/home/psdz/HDD/quan/output/dis2/checkpoints/model_dis.pth')
+                        default='/home/psdz/HDD/quan/output/experiment_7/checkpoints/model_discrimator.pth')
 
     args = parser.parse_args()
     return args
@@ -145,7 +145,7 @@ def infer():
 
     device = args.device
 
-    network = Res_Discriminator(num_classes=5, selfTrain=True)
+    network = Res_Discriminator(num_classes=2, selfTrain=True)
     weight = torch.load(args.resume_weight)['state_dict']
     network.load_state_dict(weight)
     network.eval()
@@ -160,6 +160,7 @@ def infer():
     if device == 'cuda':
         network = network.to(torch.device('cuda:0'))
 
+    correct, wrong = 0.0, 0.0
     for i, data_batch in enumerate(dataloader):
 
         batch_imgs, batch_label_ids, batch_labels = data_batch
@@ -175,11 +176,20 @@ def infer():
 
             res = results[idx, ...].cpu().detach().numpy()
             pred_id = np.argmax(res)
+            label_id = batch_label_ids[idx].cpu().item()
 
-            print('pred id: ', pred_id, res)
-            print('Label: ', batch_label_ids[idx].cpu().item(), batch_labels[idx])
-            plt.imshow(img)
-            plt.show()
+            if pred_id == label_id:
+                correct += 1.0
+            else:
+                wrong += 1.0
+
+            # print('pred id: ', pred_id, res)
+            # print('Label: ', batch_label_ids[idx].cpu().item(), batch_labels[idx])
+            # plt.imshow(img)
+            # plt.show()
+
+    print('Correct: %f Wrong: %f'%(correct/(correct+wrong), wrong/(correct+wrong)))
+
 
 if __name__ == '__main__':
     # train()

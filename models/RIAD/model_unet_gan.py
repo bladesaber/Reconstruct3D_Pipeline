@@ -288,13 +288,7 @@ class Res_Discriminator(nn.Module):
         return x
 
     def infer(self, x):
-        x_dict = self.backone(x)
-        x = x_dict['layer4']
-        x = self.final_conv(x)
-        x = self.flattern(x)
-        x = self.linear1(x)
-        x = F.relu(x)
-        x = self.linear2(x)
+        x = self.forward(x)
         out = F.softmax(x, dim=1)
         return out
 
@@ -309,7 +303,8 @@ class Res_Discriminator(nn.Module):
 
 class Adv_BCELoss_Trainer(object):
     def __init__(self):
-        self.loss_fn = nn.CrossEntropyLoss()
+        self.loss_dis_fn = nn.CrossEntropyLoss()
+        self.loss_gen_fn = nn.CrossEntropyLoss()
 
     def discrimator_loss(self, net_d, real_imgs, fake_imgs):
         batch_size = real_imgs.shape[0]
@@ -321,7 +316,7 @@ class Adv_BCELoss_Trainer(object):
         ones_array = torch.ones(batch_size, dtype=torch.long, device=d_fake.device)
         zeros_array = torch.zeros(batch_size, dtype=torch.long, device=d_fake.device)
 
-        dis_loss = self.loss_fn(d_fake, ones_array) + self.loss_fn(d_real, zeros_array)
+        dis_loss = self.loss_dis_fn(d_fake, ones_array) + self.loss_dis_fn(d_real, zeros_array)
 
         d_fake_softmax = F.softmax(d_fake, dim=1)
         d_real_softmax = F.softmax(d_real, dim=1)
@@ -336,23 +331,29 @@ class Adv_BCELoss_Trainer(object):
 
         zeros_array = torch.zeros(batch_size, dtype=torch.long, device=fake_imgs.device)
 
-        g_fake = net_d(fake_imgs)
-        gen_loss = self.loss_fn(g_fake, zeros_array)
+        with torch.no_grad():
+            g_fake = net_d(fake_imgs)
+        gen_loss = self.loss_gen_fn(g_fake, zeros_array)
 
         g_fake_softmax = F.softmax(g_fake, dim=1)
         gen_acc = accuracy(g_fake_softmax, zeros_array)
 
-        return gen_loss.mean(), gen_acc
+        return gen_loss, gen_acc
 
-    def train(self, net_d, real_imgs, fake_imgs, with_gen_loss=True):
+    def train(self, net_d, real_imgs, fake_imgs,
+              with_dis_loss=True, with_gen_loss=True
+              ):
         loss_dict = {}
         acc_dict = {}
 
-        dis_loss, dis_acc = self.discrimator_loss(
-            net_d=net_d, real_imgs=real_imgs, fake_imgs=fake_imgs
-        )
-        loss_dict.update({'dis_loss': dis_loss})
-        acc_dict.update({'dis_acc': dis_acc})
+        assert with_dis_loss or with_gen_loss
+
+        if with_dis_loss:
+            dis_loss, dis_acc = self.discrimator_loss(
+                net_d=net_d, real_imgs=real_imgs, fake_imgs=fake_imgs
+            )
+            loss_dict.update({'dis_loss': dis_loss})
+            acc_dict.update({'dis_acc': dis_acc})
 
         if with_gen_loss:
             gen_loss, gen_acc = self.generator_loss(net_d=net_d, fake_imgs=fake_imgs)

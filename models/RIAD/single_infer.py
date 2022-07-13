@@ -10,18 +10,19 @@ from tqdm import tqdm
 import datetime
 
 from models.RIAD.model_unet import UNet
+from models.RIAD.model_unet_gan import UNet_Gan
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
 
     parser.add_argument('--weight', type=str, help='',
-                        default='/home/psdz/HDD/quan/output/experiment_4/checkpoints/model_last.pth')
+                        default='/home/psdz/HDD/quan/output/experiment_7/checkpoints/model_unet.pth')
     parser.add_argument('--device', type=str, default='cuda')
 
     parser.add_argument('--mask_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/output/test/mask')
+                        default='/home/psdz/HDD/quan/RAID/masks')
     parser.add_argument('--img_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/output/test/img')
+                        default='/home/psdz/HDD/quan/RAID/images')
     parser.add_argument('--save_dir', type=str,
                         default='/home/psdz/HDD/quan/output/test/result')
     parser.add_argument('--width', type=int, default=640)
@@ -122,16 +123,16 @@ def main_with_mask():
     device = args.device
     time_tag = (datetime.datetime.now()).strftime("%Y%m%d_%H%M%S")
 
-    network = UNet()
+    # network = UNet()
+    network = UNet_Gan()
     weight = torch.load(args.weight)['state_dict']
-
-    load_weight = {}
-    for key in weight:
-        if 'perceptual_loss_fn' not in key:
-            load_weight[key] = weight[key]
-    weight = load_weight
-
+    # load_weight = {}
+    # for key in weight:
+    #     if 'perceptual_loss_fn' not in key:
+    #         load_weight[key] = weight[key]
+    # weight = load_weight
     network.load_state_dict(weight)
+
     if device == 'cuda':
         network = network.to(torch.device('cuda:0'))
     network.eval()
@@ -272,10 +273,10 @@ def single_test(img_path, mask_path, run_count):
             img = cv2.resize(img, (w, h))
 
 if __name__ == '__main__':
-    # main_with_mask()
+    main_with_mask()
 
-    single_test(
-        img_path='/home/psdz/HDD/quan/output/test/img/11.jpg',
-        mask_path='/home/psdz/HDD/quan/output/test/mask/11.jpg',
-        run_count=10
-    )
+    # single_test(
+    #     img_path='/home/psdz/HDD/quan/output/test/img/11.jpg',
+    #     mask_path='/home/psdz/HDD/quan/output/test/mask/11.jpg',
+    #     run_count=10
+    # )
