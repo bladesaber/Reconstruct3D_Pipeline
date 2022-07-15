@@ -12,6 +12,13 @@ from torchvision.models.feature_extraction import create_feature_extractor
 from models.RIAD.loss_utils import SSIMLoss, MSGMSLoss
 from torchmetrics.functional import accuracy
 
+'''
+有两种方法可以使重建产生清除效果
+1.收缩先验分布
+2.截断先验分布的重建误差，然后多次循环推断
+实际应用中，应该只变更高响应区域，其他区域保留原图以进行循环推断
+'''
+
 def upconv2x2(in_channels, out_channels, mode="transpose"):
     if mode == "transpose":
         return nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
@@ -168,6 +175,19 @@ class UNet_Gan(nn.Module):
 
         return mb_reconst
 
+    def inferv2(self, imgs, disjoint_masks):
+        mb_reconst = 0
+        mask_num = disjoint_masks.shape[1]
+
+        for mask_id in range(mask_num):
+            mask = disjoint_masks[:, mask_id, :, :]
+            mask = mask.unsqueeze(1)
+            mask_img = imgs * mask
+
+            mb_inpaint = self.forward(mask_img)
+            mb_reconst += mb_inpaint * (1 - mask)
+        return mb_reconst
+
     def train_step(self, imgs, disjoint_masks, mask_imgs, obj_masks):
         mb_reconst = 0
         mask_num = disjoint_masks.shape[1]
@@ -196,34 +216,73 @@ class UNet_Gan(nn.Module):
             'total': total_loss,
         }, mb_reconst
 
+    def loop_train_step(self, imgs, fake_imgs, disjoint_masks, obj_masks):
+        mask_num = disjoint_masks.shape[1]
+
+        fake_imgs_detach = fake_imgs.detach()
+        mb_reconst = 0
+        for mask_id in range(mask_num):
+            mask = disjoint_masks[:, mask_id, :, :]
+
+            # ### debug
+            # masks_np = mask.cpu().detach().numpy()
+            # mask_np = masks_np[0, ...]
+            # fake_imgs_np = fake_imgs_detach.cpu().numpy()
+            # fake_imgs_np = fake_imgs_np[0, ...]
+            # fake_imgs_np = np.transpose(fake_imgs_np, (1, 2, 0))
+            # plt.figure('fake')
+            # plt.imshow(fake_imgs_np)
+            # plt.figure('mask')
+            # plt.imshow(mask_np)
+
+            mask = mask.unsqueeze(dim=1)
+            fake_img_detach = fake_imgs_detach * mask
+
+            # ### debug
+            # masks_imgs_np = fake_img_detach.cpu().numpy()
+            # mask_imgs_np = masks_imgs_np[0, ...]
+            # mask_imgs_np = np.transpose(mask_imgs_np, (1, 2, 0))
+            # plt.figure('fake_mask')
+            # plt.imshow(mask_imgs_np)
+            # plt.show()
+
+            mb_inpaint = self.forward(fake_img_detach)
+            mb_reconst += mb_inpaint * (1 - mask)
+
+        dif = torch.pow((mb_reconst - imgs) * 255. * obj_masks, 2)
+        dif = torch.sqrt(torch.sum(dif, dim=(1, 2, 3))) / torch.sum(obj_masks, dim=(1, 2, 3))
+        mse_loss = dif.mean()
+
+        ssim_loss = self.ssim_loss_fn(mb_reconst, imgs, as_loss=True)
+        msgm_loss = self.msgm_loss_fn(mb_reconst, imgs, as_loss=True)
+        total_loss = mse_loss + ssim_loss + msgm_loss
+
+        return {
+            'mse': mse_loss,
+            'ssim': ssim_loss,
+            'msgm': msgm_loss,
+            'total': total_loss,
+       }, fake_imgs_detach
+
 class SN_Discriminator(nn.Module):
-    def __init__(self, width, height):
+    def __init__(self):
         super(SN_Discriminator, self).__init__()
         inc = 3
         self.conv = nn.Sequential(
-            spectral_norm(nn.Conv2d(inc, 32, 4, stride=2, padding=1, bias=False)),
+            spectral_norm(nn.Conv2d(inc, 64, 4, stride=2, padding=1, bias=False)),
             nn.LeakyReLU(0.2, inplace=True),
-            spectral_norm(nn.Conv2d(32, 64, 4, stride=2, padding=1, bias=False)),
-            nn.LeakyReLU(0.2, inplace=True),
-            spectral_norm(nn.Conv2d(64, 96, 4, stride=2, padding=1, bias=False)),
-            nn.LeakyReLU(0.2, inplace=True),
-            spectral_norm(nn.Conv2d(96, 128, 4, stride=2, padding=1, bias=False)),
+            spectral_norm(nn.Conv2d(64, 128, 4, stride=2, padding=1, bias=False)),
             nn.LeakyReLU(0.2, inplace=True),
             spectral_norm(nn.Conv2d(128, 256, 4, stride=2, padding=1, bias=False)),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(256, 1, 3, stride=1, padding=1),
+            spectral_norm(nn.Conv2d(256, 512, 4, stride=1, padding=1, bias=False)),
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(512, 1, 4, stride=1, padding=1)
         )
-
-        self.flattern = nn.Flatten()
-        input_c = int(width/32 * height/32)
-        self.linear = nn.Linear(input_c, out_features=2, bias=False)
 
     def forward(self, x):
         feat = self.conv(x)
-        feat = self.flattern(feat)
-        out = self.linear(feat)
-        return out
+        return feat
 
 class RestNet_Discriminator(nn.Module):
     def __init__(self):
@@ -372,40 +431,9 @@ if __name__ == '__main__':
     # m = UNet_Gan()
     # m = Res_Discriminator()
     # m = CNN_Discriminator()
+    m = SN_Discriminator()
 
     # m = m.cuda()
-    # summary(m, input_size=(3, 640, 480), batch_size=1)
+    summary(m, input_size=(3, 640, 480), batch_size=1)
 
-    # pos_res, neg_res = 0, 0
-    # dir = '/home/quan/Desktop/company/vis'
-    # # m = Res_Discriminator()
-    # # for path in tqdm(os.listdir(dir)):
-    # for path in tqdm(range(200)):
-    #     # apath = os.path.join(dir, path)
-    #     # img = cv2.imread(apath)
-    #     # img = img.astype(np.float32)
-    #     # img = img / 255.
-    #     # img = np.transpose(img, (2, 0, 1))
-    #     # img = img[np.newaxis, ...]
-    #     # img = torch.from_numpy(img)
-    #
-    #     # img = np.random.randint(0, 255, (640, 480, 3))
-    #     img = np.random.random((640, 480, 3))
-    #     # plt.imshow(img)
-    #     # plt.show()
-    #     img = np.transpose(img, (2, 0, 1))[np.newaxis, ...]
-    #     img = img.astype(np.float32)
-    #     img = torch.from_numpy(img)
-    #
-    #     result = m(img)
-    #     res = (result.detach().cpu().numpy())[0, ...]
-    #     print(res)
-    #     if res[0]>res[1]:
-    #         pos_res += 1
-    #     else:
-    #         neg_res += 1
-    #
-    # print(pos_res)
-    # print(neg_res)
-    #
-    # pass
+    pass

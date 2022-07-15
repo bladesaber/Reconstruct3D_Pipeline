@@ -33,9 +33,9 @@ def parse_args():
     parser.add_argument('--device', type=str, default='cuda')
 
     parser.add_argument('--resume_generator_path', type=str,
-                        default='/home/psdz/HDD/quan/output/experiment_7/checkpoints/model_unet.pth')
+                        default='/home/psdz/HDD/quan/output/experiment_1/checkpoints/model_unet.pth')
     parser.add_argument('--resume_discirmator_path', type=str,
-                        default='/home/psdz/HDD/quan/output/experiment_7/checkpoints/model_discrimator.pth')
+                        default='/home/psdz/HDD/quan/output/experiment_1/checkpoints/model_discrimator.pth')
 
     args = parser.parse_args()
     return args
@@ -63,7 +63,7 @@ def test_discrimator():
         with_aug=False,
         with_normalize=True,
         width=args.width, height=args.height,
-        cutout_sizes=(2, 4), num_disjoint_masks=3
+        cutout_sizes=(2, 4, 8), num_disjoint_masks=4
     )
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 

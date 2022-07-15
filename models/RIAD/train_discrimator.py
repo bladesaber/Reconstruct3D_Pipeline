@@ -41,7 +41,7 @@ def parse_args():
     parser.add_argument('--minimum_lr', type=float, default=1e-4)
 
     parser.add_argument('--resume_weight', type=str,
-                        default='/home/psdz/HDD/quan/output/experiment_7/checkpoints/model_discrimator.pth')
+                        default='/home/psdz/HDD/quan/output/experiment_1/checkpoints/model_discrimator.pth')
 
     args = parser.parse_args()
     return args

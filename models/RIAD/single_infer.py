@@ -16,13 +16,13 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
 
     parser.add_argument('--weight', type=str, help='',
-                        default='/home/psdz/HDD/quan/output/experiment_7/checkpoints/model_unet.pth')
+                        default='/home/psdz/HDD/quan/output/experiment_1/checkpoints/model_unet.pth')
     parser.add_argument('--device', type=str, default='cuda')
 
     parser.add_argument('--mask_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/RAID/masks')
+                        default='/home/psdz/HDD/quan/output/test/mask')
     parser.add_argument('--img_dir', type=str, help='',
-                        default='/home/psdz/HDD/quan/RAID/images')
+                        default='/home/psdz/HDD/quan/output/test/img')
     parser.add_argument('--save_dir', type=str,
                         default='/home/psdz/HDD/quan/output/test/result')
     parser.add_argument('--width', type=int, default=640)
@@ -30,7 +30,6 @@ def parse_args():
 
     args = parser.parse_args()
     return args
-
 
 def post_process(rgb_img, label_img):
     mask = np.zeros(label_img.shape, dtype=np.uint8)
@@ -116,8 +115,7 @@ def parse_img(
 
     return img.astype(np.float32), disjoint_masks.astype(np.float32), disjoint_imgs.astype(np.float32)
 
-
-def main_with_mask():
+def main_with_mask(fix_mask=False, run_count=1):
     args = parse_args()
 
     device = args.device
@@ -165,32 +163,37 @@ def main_with_mask():
         )
 
         for cutout_size in cutout_sizes:
-            _, disjoint_masks, disjoint_imgs = parse_img(
-                img=img, mask=mask,
-                cutout_size=cutout_size, num_disjoint_masks=3,
-                with_normalize=True, channel_first=True
-            )
+            for count_id in range(run_count):
+                if (count_id==0) or (not fix_mask):
+                    imgs, disjoint_masks, disjoint_imgs = parse_img(
+                        img=img, mask=mask,
+                        cutout_size=cutout_size, num_disjoint_masks=3,
+                        with_normalize=True, channel_first=True
+                    )
+                    # disjoint_imgs = disjoint_imgs[np.newaxis, ...]
+                    # disjoint_imgs = torch.from_numpy(disjoint_imgs)
+                    disjoint_masks = disjoint_masks[np.newaxis, ...]
+                    disjoint_masks = torch.from_numpy(disjoint_masks)
+                    imgs = imgs[np.newaxis, ...]
+                    imgs = torch.from_numpy(imgs)
 
-            ### debug
-            # for mask_id in range(disjoint_masks.shape[0]):
-            #     plt.figure('rgb')
-            #     plt.imshow(img)
-            #     plt.figure('mask')
-            #     plt.imshow(disjoint_masks[mask_id, ...])
-            #     plt.figure('mask_img')
-            #     plt.imshow(disjoint_imgs[mask_id, ...])
-            #     plt.show()
+                    if device == 'cuda':
+                        imgs = imgs.to(torch.device('cuda:0'))
+                        disjoint_masks = disjoint_masks.to(torch.device('cuda:0'))
+                        # disjoint_imgs = disjoint_imgs.to(torch.device('cuda:0'))
 
-            disjoint_imgs = disjoint_imgs[np.newaxis, ...]
-            disjoint_masks = disjoint_masks[np.newaxis, ...]
-            disjoint_masks = torch.from_numpy(disjoint_masks)
-            disjoint_imgs = torch.from_numpy(disjoint_imgs)
-            if device == 'cuda':
-                disjoint_masks = disjoint_masks.to(torch.device('cuda:0'))
-                disjoint_imgs = disjoint_imgs.to(torch.device('cuda:0'))
+                ### debug
+                # for mask_id in range(disjoint_masks.shape[0]):
+                #     plt.figure('rgb')
+                #     plt.imshow(img)
+                #     plt.figure('mask')
+                #     plt.imshow(disjoint_masks[mask_id, ...])
+                #     plt.figure('mask_img')
+                #     plt.imshow(disjoint_imgs[mask_id, ...])
+                #     plt.show()
 
-                rimg = network.infer(disjoint_masks=disjoint_masks, mask_imgs=disjoint_imgs)
-                rimg = rimg.detach().cpu().numpy()[0, ...]
+                fake_img = network.inferv2(disjoint_masks=disjoint_masks, imgs=imgs)
+                rimg = fake_img.detach().cpu().numpy()[0, ...]
                 rimg = np.transpose(rimg, (1, 2, 0))
                 rimg = (rimg * 255.).astype(np.uint8)
 
@@ -198,85 +201,10 @@ def main_with_mask():
                 # plt.show()
 
                 cv2.imwrite(
-                    os.path.join(name_dir, 'cut_%d.jpg' % cutout_size), rimg
+                    os.path.join(name_dir, 'cut%d_count%d.jpg' % (cutout_size, count_id)), rimg
                 )
 
-def single_test(img_path, mask_path, run_count):
-    args = parse_args()
-
-    device = args.device
-
-    network = UNet()
-    weight = torch.load(args.weight)['state_dict']
-
-    load_weight = {}
-    for key in weight:
-        if 'perceptual_loss_fn' not in key:
-            load_weight[key] = weight[key]
-    weight = load_weight
-
-    network.load_state_dict(weight)
-    if device == 'cuda':
-        network = network.to(torch.device('cuda:0'))
-    network.eval()
-
-    img = cv2.imread(img_path)
-    mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
-    if mask.ndim == 3:
-        mask = mask[:, :, 0]
-
-    orig_img = img.copy()
-    orig_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB)
-    h, w, c = img.shape
-
-    cutout_size = 2
-
-    for count_id in range(run_count):
-        img_r, mask_r = post_process(img, mask)
-        img_r = cv2.resize(img_r, (args.width, args.height))
-        mask_r = cv2.resize(mask_r, (args.width, args.height))
-
-        _, disjoint_masks, disjoint_imgs = parse_img(
-            img=img_r, mask=mask_r,
-            cutout_size=cutout_size, num_disjoint_masks=3,
-            with_normalize=True, channel_first=True
-        )
-
-        disjoint_imgs = disjoint_imgs[np.newaxis, ...]
-        disjoint_masks = disjoint_masks[np.newaxis, ...]
-        disjoint_masks = torch.from_numpy(disjoint_masks)
-        disjoint_imgs = torch.from_numpy(disjoint_imgs)
-        if device == 'cuda':
-            disjoint_masks = disjoint_masks.to(torch.device('cuda:0'))
-            disjoint_imgs = disjoint_imgs.to(torch.device('cuda:0'))
-
-            rimg = network.infer(disjoint_masks=disjoint_masks, mask_imgs=disjoint_imgs)
-            rimg = rimg.detach().cpu().numpy()[0, ...]
-            rimg = np.transpose(rimg, (1, 2, 0))
-            rimg = (rimg * 255.).astype(np.uint8)
-
-            cv2.imwrite(
-                os.path.join('/home/psdz/HDD/quan/output/test/ttt',
-                             'cut%d_count%d.jpg' % (cutout_size, count_id)),
-                rimg
-            )
-
-            img = rimg
-
-            # plt.figure('o')
-            # plt.imshow(orig_img)
-            # plt.figure('r')
-            # simg = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            # plt.imshow(simg)
-            # plt.show()
-
-            img = cv2.resize(img, (w, h))
+                imgs = fake_img
 
 if __name__ == '__main__':
-    main_with_mask()
-
-    # single_test(
-    #     img_path='/home/psdz/HDD/quan/output/test/img/11.jpg',
-    #     mask_path='/home/psdz/HDD/quan/output/test/mask/11.jpg',
-    #     run_count=10
-    # )
+    main_with_mask(fix_mask=True, run_count=6)
