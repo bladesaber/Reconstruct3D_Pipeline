@@ -421,6 +421,70 @@ class Adv_BCELoss_Trainer(object):
 
         return loss_dict, acc_dict
 
+class Adv_MapLoss_Trainer(object):
+    def __init__(self):
+        self.loss_dis_fn = nn.BCEWithLogitsLoss()
+        self.loss_gen_fn = nn.BCEWithLogitsLoss()
+
+    def discrimator_loss(self, net_d, real_imgs, fake_imgs, masks):
+        fake_imgs_detach = fake_imgs.detach()
+
+        d_fake = net_d(fake_imgs_detach)
+        d_real = net_d(real_imgs)
+
+        _, _, h, w = d_fake.size()
+        b, c, ht, wt = masks.size()
+        if h != ht or w != wt:
+            d_fake = F.interpolate(d_fake, size=(ht, wt), mode='bilinear', align_corners=True)
+            d_real = F.interpolate(d_real, size=(ht, wt), mode='bilinear', align_corners=True)
+
+        masks = masks[:, 0, :, :].unsqueeze(dim=1)
+        d_fake_tensor = d_fake[masks==1.0]
+        d_real_tensor = d_real[masks==1.0]
+
+        zeros_array = torch.zeros_like(d_fake_tensor, device=d_fake.device)
+        ones_array = torch.ones_like(d_fake_tensor, device=d_fake.device)
+
+        dis_loss = self.loss_dis_fn(d_real_tensor, zeros_array) + self.loss_dis_fn(d_fake_tensor, ones_array)
+
+        return dis_loss
+
+    def generator_loss(self, net_d, fake_imgs, masks):
+        with torch.no_grad():
+            g_fake = net_d(fake_imgs)
+
+        _, _, h, w = g_fake.size()
+        b, c, ht, wt = masks.size()
+        if h != ht or w != wt:
+            g_fake = F.interpolate(g_fake, size=(ht, wt), mode='bilinear', align_corners=True)
+
+        masks = masks[:, 0, :, :].unsqueeze(dim=1)
+        g_fake_tensor = g_fake[masks==1.0]
+        zeros_array = torch.zeros_like(g_fake_tensor, device=fake_imgs.device)
+
+        gen_loss = self.loss_gen_fn(g_fake_tensor, zeros_array)
+
+        return gen_loss
+
+    def train(self, net_d, real_imgs, fake_imgs, masks,
+              with_dis_loss=True, with_gen_loss=True
+              ):
+        loss_dict = {}
+
+        assert with_dis_loss or with_gen_loss
+
+        if with_dis_loss:
+            dis_loss = self.discrimator_loss(
+                net_d=net_d, real_imgs=real_imgs, fake_imgs=fake_imgs, masks=masks
+            )
+            loss_dict.update({'dis_loss': dis_loss})
+
+        if with_gen_loss:
+            gen_loss = self.generator_loss(net_d=net_d, fake_imgs=fake_imgs, masks=masks)
+            loss_dict.update({'gen_loss': gen_loss})
+
+        return loss_dict
+
 if __name__ == '__main__':
     from torchsummary import summary
     import cv2

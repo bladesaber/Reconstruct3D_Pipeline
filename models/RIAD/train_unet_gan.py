@@ -10,16 +10,16 @@ import numpy as np
 
 from tensorboardX import SummaryWriter
 from models.utils.utils import Best_Saver
-from models.RIAD.model_unet_gan import UNet_Gan, Res_Discriminator
+from models.RIAD.model_unet_gan import UNet_Gan, Res_Discriminator, SN_Discriminator
 from models.RIAD.aug_dataset import CustomDataset
-from models.RIAD.model_unet_gan import Adv_BCELoss_Trainer
+from models.RIAD.model_unet_gan import Adv_BCELoss_Trainer, Adv_MapLoss_Trainer
 from models.utils.logger import Metric_Recorder
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
 
     parser.add_argument('--experient', type=str, help='',
-                        default='experiment_1')
+                        default='experiment_2')
     parser.add_argument('--save_dir', type=str, help='',
                         default='/home/psdz/HDD/quan/output')
     parser.add_argument('--mask_dir', type=str, help='',
@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument('--regularization', type=float, default=0.0005)
     parser.add_argument('--gen_accumulate', type=int, default=1)
     parser.add_argument('--dis_accumulate', type=int, default=1)
-    parser.add_argument('--max_epoches', type=int, default=150)
+    parser.add_argument('--max_epoches', type=int, default=20000)
 
     parser.add_argument('--gen_stack', type=int, default=1)
     parser.add_argument('--dis_stack', type=int, default=5)
@@ -49,8 +49,8 @@ def parse_args():
     parser.add_argument('--minimum_lr', type=float, default=1e-4)
 
     parser.add_argument('--resume_generator_path', type=str,
-                        # default='/home/psdz/HDD/quan/output/experiment_1/checkpoints/model_unet.pth'
-                        default=None
+                        default='/home/psdz/HDD/quan/output/experiment_1/checkpoints/model_unet.pth'
+                        # default=None
                         )
     parser.add_argument('--resume_discirmator_path', type=str,
                         # default='/home/psdz/HDD/quan/output/experiment_9/checkpoints/model_discrimator.pth'
@@ -345,7 +345,7 @@ def train_unet_with_discrimator():
         with_aug=False,
         with_normalize=True,
         width=args.width, height=args.height,
-        cutout_sizes=(4, 8), num_disjoint_masks=4
+        cutout_sizes=(2, 4), num_disjoint_masks=3
     )
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
@@ -649,7 +649,8 @@ def train_unet_with_gan():
         unet.load_state_dict(unet_weight)
         print('[DEBUG]: Loading weight %s Successfuly'%args.resume_generator_path)
 
-    discrimator = Res_Discriminator(num_classes=2)
+    # discrimator = Res_Discriminator(num_classes=2)
+    discrimator = SN_Discriminator()
     if args.resume_discirmator_path is not None:
         dis_weight = torch.load(args.resume_discirmator_path)['state_dict']
         discrimator.load_state_dict(dis_weight)
@@ -663,7 +664,7 @@ def train_unet_with_gan():
         with_aug=False,
         with_normalize=True,
         width=args.width, height=args.height,
-        cutout_sizes=(4, 8), num_disjoint_masks=4
+        cutout_sizes=(2, ), num_disjoint_masks=3
     )
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
@@ -686,7 +687,8 @@ def train_unet_with_gan():
     unet_opt = torch.optim.Adam(unet.parameters(), lr=glr, weight_decay=args.regularization)
     disc_opt = torch.optim.Adam(discrimator.parameters(), lr=dlr, weight_decay=args.regularization)
 
-    trainer = Adv_BCELoss_Trainer()
+    # trainer = Adv_BCELoss_Trainer()
+    trainer = Adv_MapLoss_Trainer()
     recorder = Metric_Recorder()
 
     epoch = 0
@@ -718,12 +720,15 @@ def train_unet_with_gan():
             msgm_loss = gen_loss_dict['msgm']
             gen_loss = gen_loss_dict['total']
 
-            adv_loss_dict, adv_acc_dict = trainer.train(discrimator, batch_imgs, fake_imgs,
+            # adv_loss_dict, adv_acc_dict = trainer.train(discrimator, batch_imgs, fake_imgs,
+            #                                             with_gen_loss=True, with_dis_loss=True)
+            adv_loss_dict = trainer.train(discrimator, batch_imgs, fake_imgs,
+                                                        masks=batch_masks,
                                                         with_gen_loss=True, with_dis_loss=True)
             dis_loss = adv_loss_dict['dis_loss']
-            dis_acc = adv_acc_dict['dis_acc']
             restruct_loss = adv_loss_dict['gen_loss']
-            restruct_acc = adv_acc_dict['gen_acc']
+            # dis_acc = adv_acc_dict['dis_acc']
+            # restruct_acc = adv_acc_dict['gen_acc']
             gen_loss += restruct_loss
 
             ### --- backward
@@ -748,17 +753,28 @@ def train_unet_with_gan():
             loss_gen_float = recorder.add_scalar_tensor('gen_loss', gen_loss)
 
             loss_dis_float = recorder.add_scalar_tensor('dis_loss', dis_loss)
-            acc_dis_float = recorder.add_scalar_tensor('dis_acc', dis_acc)
             loss_rec_float = recorder.add_scalar_tensor('rec_loss', restruct_loss)
-            acc_rec_float = recorder.add_scalar_tensor('rec_acc', restruct_acc)
+            # acc_dis_float = recorder.add_scalar_tensor('dis_acc', dis_acc)
+            # acc_rec_float = recorder.add_scalar_tensor('rec_acc', restruct_acc)
 
+            # s = 'epoch:%d/step:%d glr:%.5f dlr:%.5f loss:%5.5f mse:%.3f ssim:%.3f msgm:%.3f ' \
+            #     'dis_loss:%.3f rec_loss:%.3f, ' \
+            #     'dis_acc:%.3f rec_acc:%.3f' \
+            #     % (
+            #     epoch, step,
+            #     gen_lr, dis_lr,
+            #     loss_gen_float, loss_mse_float, loss_ssim_float, loss_msgm_float,
+            #     loss_dis_float, loss_rec_float,
+            #     acc_dis_float, acc_rec_float
+            # )
             s = 'epoch:%d/step:%d glr:%.5f dlr:%.5f loss:%5.5f mse:%.3f ssim:%.3f msgm:%.3f ' \
-                'dis_loss:%.3f dis_acc:%.3f rec_loss:%.3f rec_acc:%.3f' % (
-                epoch, step,
-                gen_lr, dis_lr,
-                loss_gen_float, loss_mse_float, loss_ssim_float, loss_msgm_float,
-                loss_dis_float, acc_dis_float, loss_rec_float, acc_rec_float
-            )
+                'dis_loss:%.3f rec_loss:%.3f, ' \
+                % (
+                    epoch, step,
+                    gen_lr, dis_lr,
+                    loss_gen_float, loss_mse_float, loss_ssim_float, loss_msgm_float,
+                    loss_dis_float, loss_rec_float,
+                )
             print(s)
 
             step += 1
@@ -948,12 +964,12 @@ def train_unet_with_loopinfer():
 
 if __name__ == '__main__':
     # train_unet()
-    train_unet_with_loopinfer()
+    # train_unet_with_loopinfer()
     # train_discrimator()
 
     # train_unet_with_discrimator()
     # train_unet_from_discrimator()
 
-    # train_unet_with_gan()
+    train_unet_with_gan()
 
     pass

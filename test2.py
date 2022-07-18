@@ -1,21 +1,15 @@
 import os
 import shutil
 import numpy as np
+import torch
 
-dir = '/home/psdz/HDD/quan/output/test/result/20220713_131439'
-real_dir = '/home/psdz/HDD/quan/temp_trash/fakeVSreal/real'
-fake_dir = '/home/psdz/HDD/quan/temp_trash/fakeVSreal/fake'
+a = np.random.randint(0, 2, size=(2, 1, 5, 5)).astype(np.float32)
+a = torch.from_numpy(a)
 
-for idx in os.listdir(dir):
-    idx_dir = os.path.join(dir, idx)
+b = np.random.random(size=(2, 3, 5, 5)).astype(np.float32)
+b = torch.from_numpy(b)
 
-    for name in os.listdir(idx_dir):
-        if 'cut_2' in name:
-            from_path = os.path.join(idx_dir, name)
-            to_path = os.path.join(fake_dir, 'fake%s.jpg'%idx)
-            shutil.copy(from_path, to_path)
-        elif 'orig' in name:
-            from_path = os.path.join(idx_dir, name)
-            to_path = os.path.join(real_dir, 'real%s.jpg'%idx)
-            shutil.copy(from_path, to_path)
-
+a = torch.tile(a, dims=(1, 3, 1, 1))
+print(a.shape)
+print(a)
+print(b[a==1.0])
